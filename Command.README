@@ -2,3 +2,4 @@ Kiểm tra các file có quyền SUID (Set Owner User ID) : find / -perm -4000 -
 Kiểm tra các tiến trình đang chạy ẩn nội bộ : ps aux | grep root
 kiểm tra các cổng đang lắng nghe trong máy: netstat -tulnp
 # Hoặc nếu không có netstat, dùng: ss -tulnp
+Chuyển cổng khi dùng ssh : ssh -L 2121:127.0.0.1:21 sshuser@154.57.164.72 -p 31873
