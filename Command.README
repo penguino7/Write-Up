@@ -9,3 +9,4 @@ Lệnh tạo ra các ký tự: seq -w 1 9999 ( cờ -w đảm bảo ra có cùng
 Brute force với ffuf : fuf -w file_name -u target_host -X POST -H "Content-Type: application/x-www-form-urlencoded" -b "session" -d "otp=FUZZ" -fr "Invalid 2FA Code
 Default credentials : https://github.com/danielmiessler/SecLists/tree/master/Passwords/Default-Credentials
 username and password default của các hệ thống điều khiển công nghiệp : https://github.com/scadastrangelove/SCADAPASS/tree/master
+Data set chứa tên các thành phố : https://github.com/datasets/world-cities/blob/main/data/world-cities.csv
