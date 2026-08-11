@@ -23,3 +23,27 @@ C:\ (System Drive)
     ├── ⚙️ System / System32 ── Chứa file thư viện DLL lõi và Windows API
     ├── ⚙️ SysWOW64 ─────────── Chứa DLL 32-bit phục vụ chạy app trên OS 64-bit
     └── 📦 WinSxS ───────────── Kho lưu trữ cấu phần (Component Store), bản cập nhật
+
+### 📁 Thao tác Thư mục (Folder)
+
+| Thao tác | Command Prompt (CMD) | PowerShell |
+| :--- | :--- | :--- |
+| **Xem thư mục hiện tại** | `cd` | `Get-Location` hoặc `pwd` |
+| **Liệt kê file/thư mục** | `dir` | `Get-ChildItem` hoặc `ls` |
+| **Chuyển thư mục** | `cd path\to\folder` | `cd path\to\folder` |
+| **Tạo thư mục mới** | `mkdir TenThuMuc` | `New-Item -ItemType Directory -Name TenThuMuc` |
+| **Xóa thư mục rỗng** | `rmdir TenThuMuc` | `Remove-Item TenThuMuc` |
+| **Xóa thư mục & toàn bộ nội dung** | `rmdir /s /q TenThuMuc` | `Remove-Item -Recurse -Force TenThuMuc` |
+| **Đổi tên thư mục** | `ren TenCu TenMoi` | `Rename-Item TenCu TenMoi` |
+
+### 📄 Thao tác File
+
+| Thao tác | Command Prompt (CMD) | PowerShell |
+| :--- | :--- | :--- |
+| **Tạo file rỗng** | `type nul > file.txt` | `New-Item -ItemType File -Name file.txt` |
+| **Xem nội dung file** | `type file.txt` | `Get-Content file.txt` hoặc `cat file.txt` |
+| **Sao chép file** | `copy file1.txt file2.txt` | `Copy-Item file1.txt file2.txt` |
+| **Di chuyển file** | `move file.txt path\to\destination` | `Move-Item file.txt path\to\destination` |
+| **Đổi tên file** | `ren file_cu.txt file_moi.txt` | `Rename-Item file_cu.txt file_moi.txt` |
+| **Xóa file** | `del file.txt` | `Remove-Item file.txt` |
+| **Tìm kiếm chuỗi trong file** | `findstr "noi_dung" file.txt` | `Select-String -Path file.txt -Pattern "noi_dung"` |
