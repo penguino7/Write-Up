@@ -36,11 +36,12 @@ C:\ (System Drive)
 * [📁 Thao tác với Thư mục](#-thao-tác-với-thư-mục)
   * [1. Xem thư mục hiện tại](#1-xem-thư-mục-hiện-tại)
   * [2. Liệt kê nội dung thư mục](#2-liệt-kê-nội-dung-thư-mục)
-  * [3. Chuyển đổi thư mục](#3-chuyển-đổi-thư-mục)
-  * [4. Tạo thư mục mới](#4-tạo-thư-mục-mới)
-  * [5. Xóa thư mục](#5-xóa-thư-mục)
-  * [6. Đổi tên hoặc Di chuyển thư mục](#6-đổi-tên-hoặc-di-chuyển-thư-mục)
-  * [7. Sao chép thư mục](#7-sao-chép-thư-mục)
+  * [3. Xem cấu trúc cây thư mục](#3-xem-cấu-trúc-cây-thư-mục)
+  * [4. Chuyển đổi thư mục](#4-chuyển-đổi-thư-mục)
+  * [5. Tạo thư mục mới](#5-tạo-thư-mục-mới)
+  * [6. Xóa thư mục](#6-xóa-thư-mục)
+  * [7. Đổi tên hoặc Di chuyển thư mục](#7-đổi-tên-hoặc-di-chuyển-thư-mục)
+  * [8. Sao chép thư mục](#8-sao-chép-thư-mục)
 * [📄 Thao tác với File](#-thao-tác-với-file)
   * [1. Tạo file mới](#1-tạo-file-mới)
   * [2. Xem nội dung file](#2-xem-nội-dung-file)
@@ -76,7 +77,20 @@ C:\ (System Drive)
 
 ---
 
-### 3. Chuyển đổi thư mục
+### 3. Xem cấu trúc cây thư mục
+
+| Môi trường | Lệnh | Mô tả / Cờ (Flag) |
+| :--- | :--- | :--- |
+| **CMD** | `tree` | Hiển thị sơ đồ cây các thư mục con |
+| **CMD** | `tree /F` | Hiển thị sơ đồ cây bao gồm cả **thư mục và các file** bên trong (`/F`) |
+| **CMD** | `tree /A` | Sử dụng ký tự ASCII tiêu chuẩn để vẽ cây (`/A`) |
+| **CMD** | `tree /F /A` | Kết hợp hiển thị cả file và vẽ bằng ký tự ASCII chuẩn |
+| **PowerShell** | `tree /F` | Sử dụng lệnh `tree` của hệ thống trong PowerShell |
+| **PowerShell** | `Get-ChildItem -Recurse` | Liệt kê đệ quy danh sách dạng bảng |
+
+---
+
+### 4. Chuyển đổi thư mục
 
 | Môi trường | Lệnh | Mô tả / Cờ (Flag) |
 | :--- | :--- | :--- |
@@ -88,7 +102,7 @@ C:\ (System Drive)
 
 ---
 
-### 4. Tạo thư mục mới
+### 5. Tạo thư mục mới
 
 | Môi trường | Lệnh | Mô tả |
 | :--- | :--- | :--- |
@@ -98,7 +112,7 @@ C:\ (System Drive)
 
 ---
 
-### 5. Xóa thư mục
+### 6. Xóa thư mục
 
 | Môi trường | Lệnh | Mô tả / Cờ (Flag) |
 | :--- | :--- | :--- |
@@ -111,7 +125,7 @@ C:\ (System Drive)
 
 ---
 
-### 6. Đổi tên hoặc Di chuyển thư mục
+### 7. Đổi tên hoặc Di chuyển thư mục
 
 | Môi trường | Lệnh | Mô tả |
 | :--- | :--- | :--- |
@@ -122,7 +136,7 @@ C:\ (System Drive)
 
 ---
 
-### 7. Sao chép thư mục
+### 8. Sao chép thư mục
 
 | Môi trường | Lệnh | Mô tả / Cờ (Flag) |
 | :--- | :--- | :--- |
@@ -198,4 +212,3 @@ C:\ (System Drive)
 | **CMD** | `findstr /i "chuoi" file.txt` | Tìm kiếm không phân biệt hoa/thường (`/i`) |
 | **CMD** | `findstr /s /i "chuoi" *.txt` | Tìm đệ quy trong tất cả thư mục con (`/s`) |
 | **PowerShell** | `Select-String -Path file.txt -Pattern "chuoi"` | Tìm dòng chứa từ khóa |
-
