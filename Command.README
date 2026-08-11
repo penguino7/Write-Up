@@ -11,4 +11,4 @@ Default credentials : https://github.com/danielmiessler/SecLists/tree/master/Pas
 username and password default của các hệ thống điều khiển công nghiệp : https://github.com/scadastrangelove/SCADAPASS/tree/master
 Data set chứa tên các thành phố : https://github.com/datasets/world-cities/blob/main/data/world-cities.csv
 Kết nối từ xa trên windows : Remote desktop connection 
-Kết nối từ xa trên linux sang windows:  xfreerdp 
+Kết nối từ xa trên linux sang windows:  xfreerdp :  xfreerdp /v:<targetIp> /u:username /p:Password
