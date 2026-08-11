@@ -10,3 +10,5 @@ Brute force với ffuf : fuf -w file_name -u target_host -X POST -H "Content-Typ
 Default credentials : https://github.com/danielmiessler/SecLists/tree/master/Passwords/Default-Credentials
 username and password default của các hệ thống điều khiển công nghiệp : https://github.com/scadastrangelove/SCADAPASS/tree/master
 Data set chứa tên các thành phố : https://github.com/datasets/world-cities/blob/main/data/world-cities.csv
+Kết nối từ xa trên windows : Remote desktop connection 
+Kết nối từ xa trên linux :  xfreerdp 
