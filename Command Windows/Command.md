@@ -32,5 +32,170 @@ C:\ (System Drive)
     └── 📦 WinSxS ───────────── Kho lưu trữ cấu phần (Component Store), bản cập nhật
 ```
 
+## Table of Contents
+* [📁 Thao tác với Thư mục](#-thao-tác-với-thư-mục)
+  * [1. Xem thư mục hiện tại](#1-xem-thư-mục-hiện-tại)
+  * [2. Liệt kê nội dung thư mục](#2-liệt-kê-nội-dung-thư-mục)
+  * [3. Chuyển đổi thư mục](#3-chuyển-đổi-thư-mục)
+  * [4. Tạo thư mục mới](#4-tạo-thư-mục-mới)
+  * [5. Xóa thư mục](#5-xóa-thư-mục)
+  * [6. Đổi tên hoặc Di chuyển thư mục](#6-đổi-tên-hoặc-di-chuyển-thư-mục)
+  * [7. Sao chép thư mục](#7-sao-chép-thư-mục)
+* [📄 Thao tác với File](#-thao-tác-với-file)
+  * [1. Tạo file mới](#1-tạo-file-mới)
+  * [2. Xem nội dung file](#2-xem-nội-dung-file)
+  * [3. Sao chép file](#3-sao-chép-file)
+  * [4. Di chuyển & Đổi tên file](#4-di-chuyển--đổi-tên-file)
+  * [5. Xóa file](#5-xóa-file)
+  * [6. Tìm kiếm trong file](#6-tìm-kiếm-trong-file)
 
+---
+
+## 📁 Thao tác với Thư mục
+
+### 1. Xem thư mục hiện tại
+
+| Môi trường | Lệnh |
+| :--- | :--- |
+| **CMD** | `cd` |
+| **PowerShell** | `Get-Location` hoặc `pwd` |
+
+---
+
+### 2. Liệt kê nội dung thư mục
+
+| Môi trường | Lệnh | Mô tả / Cờ (Flag) |
+| :--- | :--- | :--- |
+| **CMD** | `dir` | Liệt kê cơ bản |
+| **CMD** | `dir /a` | Hiển thị tất cả file/thư mục (bao gồm file ẩn) |
+| **CMD** | `dir /b` | Chỉ hiển thị tên (định dạng ngắn gọn) |
+| **CMD** | `dir /s` | Liệt kê đệ quy toàn bộ thư mục con |
+| **PowerShell** | `Get-ChildItem` (hoặc `ls`) | Liệt kê cơ bản |
+| **PowerShell** | `Get-ChildItem -Force` | Hiển thị tất cả (bao gồm file ẩn/hệ thống) |
+| **PowerShell** | `Get-ChildItem -Recurse` | Liệt kê đệ quy |
+
+---
+
+### 3. Chuyển đổi thư mục
+
+| Môi trường | Lệnh | Mô tả / Cờ (Flag) |
+| :--- | :--- | :--- |
+| **CMD / PowerShell** | `cd path\to\folder` | Chuyển đến thư mục chỉ định |
+| **CMD / PowerShell** | `cd ..` | Quay lại thư mục cha (lên 1 cấp) |
+| **CMD / PowerShell** | `cd \` | Quay về thư mục gốc của ổ đĩa |
+| **CMD** | `cd /d D:\folder` | Chuyển sang ổ đĩa khác (cần cờ `/d`) |
+| **PowerShell** | `Set-Location D:\folder` | Chuyển sang ổ đĩa/thư mục khác |
+
+---
+
+### 4. Tạo thư mục mới
+
+| Môi trường | Lệnh | Mô tả |
+| :--- | :--- | :--- |
+| **CMD** | `mkdir TenThuMuc` | Tạo thư mục mới |
+| **CMD** | `mkdir Sub1\Sub2\Sub3` | Tạo nhiều cấp thư mục lồng nhau cùng lúc |
+| **PowerShell** | `New-Item -ItemType Directory -Name "TenThuMuc"` | Tạo thư mục mới |
+
+---
+
+### 5. Xóa thư mục
+
+| Môi trường | Lệnh | Mô tả / Cờ (Flag) |
+| :--- | :--- | :--- |
+| **CMD** | `rmdir TenThuMuc` | Chỉ xóa thư mục rỗng |
+| **CMD** | `rmdir /s TenThuMuc` | Xóa đệ quy kèm thư mục con (có hỏi xác nhận) |
+| **CMD** | `rmdir /s /q TenThuMuc` | Xóa đệ quy im lặng, không hỏi xác nhận (`/q`) |
+| **PowerShell** | `Remove-Item TenThuMuc` | Xóa thư mục rỗng |
+| **PowerShell** | `Remove-Item TenThuMuc -Recurse` | Xóa đệ quy toàn bộ thư mục con |
+| **PowerShell** | `Remove-Item TenThuMuc -Recurse -Force` | Ép buộc xóa cả file ẩn/chỉ đọc (`-Force`) |
+
+---
+
+### 6. Đổi tên hoặc Di chuyển thư mục
+
+| Môi trường | Lệnh | Mô tả |
+| :--- | :--- | :--- |
+| **CMD** | `ren TenCu TenMoi` | Đổi tên thư mục |
+| **CMD** | `move ThuMucNguon ThuMucDich` | Di chuyển thư mục sang vị trí khác |
+| **PowerShell** | `Rename-Item -Path "TenCu" -NewName "TenMoi"` | Đổi tên thư mục |
+| **PowerShell** | `Move-Item -Path "Nguon" -Destination "Dich"` | Di chuyển thư mục |
+
+---
+
+### 7. Sao chép thư mục
+
+| Môi trường | Lệnh | Mô tả / Cờ (Flag) |
+| :--- | :--- | :--- |
+| **CMD** | `xcopy Nguon Dich /E /I /H` | `/E`: Sao chép cả thư mục rỗng<br>`/I`: Tự tạo thư mục đích nếu chưa có<br>`/H`: Sao chép cả file ẩn/hệ thống |
+| **CMD** | `robocopy Nguon Dich /E /ZB` | `/E`: Sao chép đệ quy<br>`/ZB`: Chế độ sao chép an toàn (khôi phục khi đứt đoạn) |
+| **PowerShell** | `Copy-Item Nguon Dich -Recurse` | Sao chép đệ quy toàn bộ thư mục con |
+
+---
+
+## 📄 Thao tác với File
+
+### 1. Tạo file mới
+
+| Môi trường | Lệnh | Mô tả |
+| :--- | :--- | :--- |
+| **CMD** | `type nul > file.txt` | Tạo file rỗng |
+| **CMD** | `echo noi_dung > file.txt` | Tạo file kèm nội dung ban đầu |
+| **PowerShell** | `New-Item -ItemType File -Name "file.txt"` | Tạo file rỗng |
+
+---
+
+### 2. Xem nội dung file
+
+| Môi trường | Lệnh | Mô tả / Cờ (Flag) |
+| :--- | :--- | :--- |
+| **CMD** | `type file.txt` | Đọc toàn bộ nội dung file |
+| **PowerShell** | `Get-Content file.txt` | Đọc nội dung file |
+| **PowerShell** | `Get-Content file.txt -Head 10` | Chỉ đọc 10 dòng đầu tiên (`-Head`) |
+| **PowerShell** | `Get-Content file.txt -Tail 10` | Chỉ đọc 10 dòng cuối cùng (`-Tail`) |
+
+---
+
+### 3. Sao chép file
+
+| Môi trường | Lệnh | Mô tả / Cờ (Flag) |
+| :--- | :--- | :--- |
+| **CMD** | `copy file1.txt file2.txt` | Sao chép file sang file mới |
+| **CMD** | `copy *.txt D:\Backup\` | Sao chép toàn bộ file `.txt` sang thư mục khác |
+| **CMD** | `copy /Y file1.txt file2.txt` | Sao chép và ghi đè không hỏi lại (`/Y`) |
+| **PowerShell** | `Copy-Item file1.txt file2.txt` | Sao chép file |
+| **PowerShell** | `Copy-Item file1.txt file2.txt -Force` | Ép buộc ghi đè nếu file đã tồn tại |
+
+---
+
+### 4. Di chuyển & Đổi tên file
+
+| Môi trường | Lệnh | Mô tả |
+| :--- | :--- | :--- |
+| **CMD** | `ren file_cu.txt file_moi.txt` | Đổi tên file |
+| **CMD** | `move file.txt D:\Destination\` | Di chuyển file sang thư mục mới |
+| **PowerShell** | `Rename-Item file_cu.txt file_moi.txt` | Đổi tên file |
+| **PowerShell** | `Move-Item file.txt D:\Destination\` | Di chuyển file |
+
+---
+
+### 5. Xóa file
+
+| Môi trường | Lệnh | Mô tả / Cờ (Flag) |
+| :--- | :--- | :--- |
+| **CMD** | `del file.txt` | Xóa file chỉ định |
+| **CMD** | `del /f file.txt` | Ép buộc xóa file chỉ đọc (Read-only) (`/f`) |
+| **CMD** | `del /q *.log` | Xóa tất cả file `.log` không hỏi xác nhận (`/q`) |
+| **PowerShell** | `Remove-Item file.txt` | Xóa file |
+| **PowerShell** | `Remove-Item file.txt -Force` | Ép buộc xóa file ẩn/chỉ đọc |
+
+---
+
+### 6. Tìm kiếm trong file
+
+| Môi trường | Lệnh | Mô tả / Cờ (Flag) |
+| :--- | :--- | :--- |
+| **CMD** | `findstr "chuoi" file.txt` | Tìm dòng chứa từ khóa |
+| **CMD** | `findstr /i "chuoi" file.txt` | Tìm kiếm không phân biệt hoa/thường (`/i`) |
+| **CMD** | `findstr /s /i "chuoi" *.txt` | Tìm đệ quy trong tất cả thư mục con (`/s`) |
+| **PowerShell** | `Select-String -Path file.txt -Pattern "chuoi"` | Tìm dòng chứa từ khóa |
 
