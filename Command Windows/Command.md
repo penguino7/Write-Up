@@ -1,8 +1,15 @@
-WMI : Kho dữ liệu về các phần cứng , phần mềm, các tiến trình và dịch vụ đang chạy 
-Get-WmiObject : là lệnh truy vấn trên powershell để lấy dữ liệy từ kho WMI 
-Get-WmiObject -Class win32_OperatingSystem | select Version,BuildNumber : Lớp chứa thông tin về hệ điều hành đang cài trên máy -> lấy version và số bản dựng của bản cập nhật
-Thư mục gốc : C:\ -> Thư mục gốc , còn gọi là phân vùng khởi động , là nơi cài đặt hệ điều hành 
-Cấu trúc thư mục : 
+* **WMI**: Kho dữ liệu về các phần cứng, phần mềm, các tiến trình và dịch vụ đang chạy.
+* **Get-WmiObject**: Là lệnh truy vấn trên PowerShell để lấy dữ liệu từ kho WMI.
+* **Get-WmiObject -Class win32_OperatingSystem | select Version,BuildNumber**: Lớp chứa thông tin về hệ điều hành đang cài trên máy \(\rightarrow\) lấy version và số bản dựng của bản cập nhật.
+
+---
+
+### Thư mục gốc (`C:\`)
+Còn gọi là phân vùng khởi động, là nơi cài đặt hệ điều hành.
+
+**Cấu trúc thư mục:**
+
+```text
 C:\ (System Drive)
 │
 ├── 📂 Perflogs ─────────────── Chứa log hiệu năng (Mặc định trống)
@@ -23,6 +30,8 @@ C:\ (System Drive)
     ├── ⚙️ System / System32 ── Chứa file thư viện DLL lõi và Windows API
     ├── ⚙️ SysWOW64 ─────────── Chứa DLL 32-bit phục vụ chạy app trên OS 64-bit
     └── 📦 WinSxS ───────────── Kho lưu trữ cấu phần (Component Store), bản cập nhật
+```
+
 
 
 | First Header  | Second Header |
