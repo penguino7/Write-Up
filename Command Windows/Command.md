@@ -34,7 +34,7 @@ C:\ (System Drive)
 
 ## Table of Contents
 
-* 📁 [Thao tác với Thư mục](#thao-tác-với-thư-mục)
+* 📂 [Thao tác với Thư mục](#thao-tác-với-thư-mục)
     * [1. Xem thư mục hiện tại](#1-xem-thư-mục-hiện-tại)
     * [2. Liệt kê nội dung thư mục](#2-liệt-kê-nội-dung-thư-mục)
     * [3. Xem cấu trúc cây thư mục](#3-xem-cấu-trúc-cây-thư-mục)
@@ -51,6 +51,15 @@ C:\ (System Drive)
     * [4. Di chuyển & Đổi tên file](#4-di-chuyển--đổi-tên-file)
     * [5. Xóa file](#5-xóa-file)
     * [6. Tìm kiếm trong file](#6-tìm-kiếm-trong-file)
+* 🌐 [Thao tác mạng với smbclient](#thao-tác-mạng-với-smbclient)
+    * [1. Giải thích về smbclient](#1-giải-thích-về-smbclient)
+    * [2. Liệt kê thư mục đang chia sẻ](#2-liệt-kê-thư-mục-đang-chia-sẻ)
+    * [3. Kết nối thư mục chia sẻ cụ thể](#3-kết-nối-thư-mục-chia-sẻ-cụ-thể)
+    * [4. Kết nối ẩn danh (Anonymous/Guest)](#4-kết-nối-ẩn-danh-anonymousguest)
+    * [5. Kết nối từ máy thuộc Domain mạng doanh nghiệp](#5-kết-nối-từ-máy-thuộc-domain-mạng-doanh-nghiệp)
+    * [6. Các lệnh thao tác khi kết nối thành công](#6-các-lệnh-thao-tác-khi-kết-nối-thành-công)
+
+  
 
 
 ---
@@ -212,6 +221,32 @@ C:\ (System Drive)
   icacls "C:\Data" /restore "C:\Backup\acl_backup.txt"
   ```
 
+#### Các cài đặt Kế thừa quyền (Inheritance Flags)
+
+Khi bạn xem quyền bằng lệnh `icacls`, các ký hiệu này sẽ xuất hiện ngay sau tên người dùng (ví dụ: `Administrator:(I)(F)` hoặc `User:(OI)(CI)(IO)(M)`) để chỉ định cách quyền hạn lan truyền từ thư mục cha xuống cấp con.
+
+* **`(I)` - Permission inherited from parent container (Quyền được kế thừa từ cha):**
+  * **Ý nghĩa:** Quyền này không phải do bạn đặt trực tiếp tại thư mục này, mà nó tự động "thừa hưởng" từ thư mục cha cấp cao hơn truyền xuống.
+* **`(OI)` - Object inherit (Kế thừa đối tượng):**
+  * **Ý nghĩa:** Các **tệp tin (file)** được tạo ra bên trong thư mục này sẽ tự động nhận quyền từ thư mục cha. Nó không áp dụng cho thư mục con.
+* **`(CI)` - Container inherit (Kế thừa vùng chứa):**
+  * **Ý nghĩa:** Các **thư mục con (sub-folder)** được tạo ra bên trong thư mục này sẽ tự động nhận quyền từ thư mục cha. Nó không áp dụng cho tệp tin.
+* **`(IO)` - Inherit only (Chỉ kế thừa):**
+  * **Ý nghĩa:** Quyền này **không áp dụng** cho chính thư mục hiện tại, mà nó chỉ đóng vai trò làm khuôn mẫu để truyền xuống cho các file hoặc thư mục con bên trong mà thôi.
+* **`(NP)` - Do not propagate inherit (Không lan truyền kế thừa):**
+  * **Ý nghĩa:** Quyền này chỉ truyền xuống **đúng 1 cấp** (cho file và thư mục con trực tiếp bên trong nó). Các thư mục cháu, chắt sâu hơn nữa sẽ không nhận được quyền này.
+
+---
+
+#### Các tổ hợp thường gặp trong thực tế
+
+Để dễ hình dung, các cờ này thường đi chung với nhau thành các bộ quy tắc:
+
+* **`(OI)(CI)`**: Cả file và thư mục con bên trong đều nhận quyền. Đây là chế độ mặc định của Windows khi bạn tạo mới một thư mục.
+* **`(OI)(CI)(IO)`**: Bản thân thư mục cha không bị ảnh hưởng bởi quyền này, nhưng toàn bộ file và thư mục con bên trong nó sẽ dính quyền.
+* **`(CI)(IO)`**: Chỉ áp dụng quyền cho các thư mục con bên trong, bản thân thư mục cha và các file lẻ không bị ảnh hưởng.
+* **`(OI)(NP)`**: Chỉ áp dụng quyền cho thư mục cha và các file trực tiếp cấp dưới nó, các thư mục con và cấp sâu hơn bị chặn, không nhận quyền.
+
 
 ## 📄 Thao tác với File
 
@@ -279,3 +314,43 @@ C:\ (System Drive)
 | **CMD** | `findstr /i "chuoi" file.txt` | Tìm kiếm không phân biệt hoa/thường (`/i`) |
 | **CMD** | `findstr /s /i "chuoi" *.txt` | Tìm đệ quy trong tất cả thư mục con (`/s`) |
 | **PowerShell** | `Select-String -Path file.txt -Pattern "chuoi"` | Tìm dòng chứa từ khóa |
+
+## 🌐 Thao tác mạng với smbclient
+
+### 1. Giải thích về smbclient
+`smbclient` là công cụ dòng lệnh trên Linux/Unix, hoạt động tương tự FTP client nhưng dành riêng cho giao thức **SMB/CIFS** (mặc định của Windows và Samba server). Nó giúp máy Linux kết nối, quản lý, tải lên hoặc tải xuống các file nằm trên thư mục chia sẻ từ xa.
+
+### 2. Liệt kê thư mục đang chia sẻ
+Kiểm tra xem máy chủ mục tiêu đang chia sẻ những thư mục nào.
+* **Cú pháp:** `smbclient -L //<IP_hoặc_Tên_Máy_Chủ> -U <username>`
+* **Ví dụ:** `smbclient -L //192.168.1.50 -U lananh`
+
+### 3. Kết nối thư mục chia sẻ cụ thể
+Truy cập trực tiếp vào thư mục đích để bắt đầu quản lý file.
+* **Cú pháp:** `smbclient //<IP_hoặc_Tên_Máy_Chủ>/<Tên_Thư_Mục> -U <username>`
+* **Ví dụ:** `smbclient //192.168.1.50/TaiLieu -U lananh`
+
+### 4. Kết nối ẩn danh (Anonymous/Guest)
+Sử dụng khi thư mục từ xa được cấu hình chia sẻ công khai không mật khẩu.
+* **Cú pháp:** `smbclient //<IP_hoặc_Tên_Máy_Chủ>/<Tên_Thư_Mục> -N`
+* **Ví dụ:** `smbclient //192.168.1.50/PublicData -N`
+
+### 5. Kết nối từ máy thuộc Domain mạng doanh nghiệp
+Sử dụng khi tài khoản thuộc một vùng quản lý Domain cụ thể trong công ty.
+* **Cú pháp:** `smbclient //<IP_hoặc_Tên_Máy_Chủ>/<Tên_Thư_Mục> -U <username> -W <DOMAIN_NAME>`
+* **Ví dụ:** `smbclient //192.168.1.50/KếToán -U lananh -W COMPANY_DOMAIN`
+
+### 6. Các lệnh thao tác khi kết nối thành công
+Sau khi kết nối thành công, giao diện sẽ đổi thành `smb: \>`. Bạn dùng các lệnh sau:
+
+| Câu lệnh | Chức năng chi tiết | Ví dụ thực tế |
+| :--- | :--- | :--- |
+| **`ls`** | Liệt kê file/thư mục trên máy chủ | `smb: \> ls` |
+| **`cd`** | Di chuyển giữa các thư mục từ xa | `smb: \> cd ThuMucCon` |
+| **`lcd`** | Thay đổi thư mục hiện hành trên máy Linux local | `smb: \> lcd /home/user/Downloads` |
+| **`get`** | Tải file từ máy chủ từ xa về máy Linux | `smb: \> get BaoCao.xlsx` |
+| **`put`** | Tải file từ máy Linux lên máy chủ từ xa | `smb: \> put DuAn.zip` |
+| **`mkdir`** | Tạo thư mục mới trên máy chủ từ xa | `smb: \> mkdir Backup` |
+| **`rm`** | Xóa file trên máy chủ từ xa | `smb: \> rm ThongTinCu.txt` |
+| **`exit`** | Thoát khỏi giao diện smbclient | `smb: \> exit` |
+
