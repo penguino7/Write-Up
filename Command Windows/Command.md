@@ -58,13 +58,12 @@ C:\ (System Drive)
     * [4. Kết nối ẩn danh (Anonymous/Guest)](#4-kết-nối-ẩn-danh-anonymousguest)
     * [5. Kết nối từ máy thuộc Domain mạng doanh nghiệp](#5-kết-nối-từ-máy-thuộc-domain-mạng-doanh-nghiệp)
     * [6. Các lệnh thao tác khi kết nối thành công](#6-các-lệnh-thao-tác-khi-kết-nối-thành-công)
-* ⚙️ [Windows Registry](#windows-registry)
+* ⚙️ [Windows Registry](#️-windows-registry)
     * [1. Khái niệm và Vai trò](#1-khái-niệm-và-vai-trò)
     * [2. Cấu trúc Registry (Hives, Keys, Values)](#2-cấu-trúc-registry-hives-keys-values)
     * [3. Các Registry Hives chính](#3-các-registry-hives-chính)
     * [4. Các kiểu dữ liệu phổ biến](#4-các-kiểu-dữ-liệu-phổ-biến)
     * [5. Quản lý Registry với Registry Editor (regedit)](#5-quản-lý-registry-với-registry-editor-regedit)
-    * [6. Bài thực hành: Tạo Key và Value cơ bản](#6-bài-thực-hành-tạo-key-và-value-cơ-bản)
 ---
 
 ## 📁 Thao tác với Thư mục
@@ -357,35 +356,364 @@ Sau khi kết nối thành công, giao diện sẽ đổi thành `smb: \>`. Bạ
 | **`rm`** | Xóa file trên máy chủ từ xa | `smb: \> rm ThongTinCu.txt` |
 | **`exit`** | Thoát khỏi giao diện smbclient | `smb: \> exit` |
 
-## ⚙️ Windows Registry
+# ⚙️ Windows Registry
 
-### 1. Khái niệm & Vai trò
-**Windows Registry** là cơ sở dữ liệu phân cấp trung tâm được Windows và hầu hết các ứng dụng lưu trữ thông tin cấu hình. Registry chứa toàn bộ các thiết lập liên quan đến:
+## Table of Contents
+
+* [⚙️ Windows Registry](#️-windows-registry)
+
+  * [1. Khái niệm và Vai trò](#1-khái-niệm-và-vai-trò)
+  * [2. Cấu trúc Registry (Hives, Keys, Values)](#2-cấu-trúc-registry-hives-keys-values)
+  * [3. Các Registry Hives chính](#3-các-registry-hives-chính)
+  * [4. Các kiểu dữ liệu phổ biến](#4-các-kiểu-dữ-liệu-phổ-biến)
+  * [5. Quản lý Registry với Registry Editor (regedit)](#5-quản-lý-registry-với-registry-editor-regedit)
+
+---
+
+## 1. Khái niệm và Vai trò
+
+**Windows Registry** là cơ sở dữ liệu phân cấp trung tâm được Windows và hầu hết các ứng dụng sử dụng để lưu trữ thông tin cấu hình.
+
+Registry chứa các thiết lập liên quan đến:
+
 * Hồ sơ người dùng (User Profiles)
-* Cấu hình phần mềm, phần cứng
+* Cấu hình phần mềm và phần cứng
 * Các dịch vụ hệ thống (Services)
 * Chính sách bảo mật (Security Policies)
 * Các thiết lập tùy chỉnh của hệ điều hành
 
-> ⚠️ **Lưu ý quan trọng:** Bất kỳ sai sót nào khi chỉnh sửa Registry đều có thể khiến ứng dụng hoặc các thành phần của Windows bị lỗi. Bạn nên luôn kiểm tra trên môi trường Lab/máy ảo hoặc sao lưu trước khi thực hiện thay đổi.
+> ⚠️ **Lưu ý quan trọng:** Bất kỳ sai sót nào khi chỉnh sửa Registry đều có thể khiến ứng dụng hoặc các thành phần của Windows bị lỗi. Bạn nên luôn kiểm tra trên môi trường Lab/máy ảo hoặc sao lưu Registry trước khi thực hiện thay đổi.
 
 ---
 
-### 2. Cấu trúc Registry (Hives, Keys, Values)
-Registry được tổ chức theo mô hình cây phân cấp tương tự như thư mục và tệp tin trong hệ thống tệp Windows:
+## 2. Cấu trúc Registry (Hives, Keys, Values)
 
-| Thành phần | Mô tả | Tương đương trong File System |
-| :--- | :--- | :--- |
-| **Hive** | Phần cao nhất của Registry, chứa nhóm các thiết lập hệ thống hoặc user. | Ổ đĩa (`C:\`, `D:\`) |
-| **Key** | Thư mục chứa bên trong Hive. Một Key có thể chứa các Key con hoặc Value. | Thư mục (Folder) |
-| **Subkey** | Thẻ/Key nằm bên trong một Key khác để tổ chức cấu hình. | Thư mục con (Subfolder) |
-| **Value** | Giá trị cấu hình cụ thể nằm trong Key. | Tập tin (File) |
+Registry được tổ chức theo mô hình cây phân cấp tương tự như thư mục và tệp tin trong hệ thống tệp Windows.
 
-#### Một Registry Value bao gồm 3 thành phần chính:
-1. **Name:** Tên định danh thiết lập.
-2. **Type:** Kiểu dữ liệu lưu trữ.
+| Thành phần | Mô tả                                                                             | Tương đương trong File System |
+| :--------- | :-------------------------------------------------------------------------------- | :---------------------------- |
+| **Hive**   | Phần cao nhất của Registry, chứa một nhóm các thiết lập hệ thống hoặc người dùng. | Ổ đĩa (`C:\`, `D:\`)          |
+| **Key**    | Thư mục nằm bên trong Hive. Một Key có thể chứa các Key con hoặc Value.           | Thư mục (Folder)              |
+| **Subkey** | Key nằm bên trong một Key khác để tổ chức cấu hình.                               | Thư mục con (Subfolder)       |
+| **Value**  | Giá trị cấu hình cụ thể nằm trong một Key.                                        | Tập tin (File)                |
+
+### Một Registry Value bao gồm 3 thành phần chính
+
+1. **Name:** Tên định danh của thiết lập.
+2. **Type:** Kiểu dữ liệu được sử dụng để lưu trữ.
 3. **Data:** Giá trị dữ liệu cấu hình thực tế.
 
-*Ví dụ về đường dẫn Registry:*
+### Ví dụ về đường dẫn Registry
+
 ```text
 HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion
+```
+
+Trong đường dẫn trên:
+
+* **`HKEY_LOCAL_MACHINE`**: Hive
+* **`SOFTWARE`**: Key nằm trong Hive
+* **`Microsoft`**: Subkey
+* **`Windows`**: Subkey
+* **`CurrentVersion`**: Subkey
+
+Có thể hình dung cấu trúc như sau:
+
+```text
+HKEY_LOCAL_MACHINE
+└── SOFTWARE
+    └── Microsoft
+        └── Windows
+            └── CurrentVersion
+```
+
+---
+
+## 3. Các Registry Hives chính
+
+| Hive                  | Tên viết tắt | Mục đích & Phạm vi                                                                                 |
+| :-------------------- | :----------- | :------------------------------------------------------------------------------------------------- |
+| `HKEY_CURRENT_USER`   | **HKCU**     | Lưu các thiết lập riêng của người dùng hiện đang đăng nhập.                                        |
+| `HKEY_LOCAL_MACHINE`  | **HKLM**     | Lưu các thiết lập toàn hệ thống liên quan đến phần cứng, phần mềm và hệ điều hành.                 |
+| `HKEY_CLASSES_ROOT`   | **HKCR**     | Lưu thông tin liên quan đến file associations, COM classes và các thành phần đăng ký của ứng dụng. |
+| `HKEY_USERS`          | **HKU**      | Chứa các cấu hình Registry của những user profiles đang được nạp trên máy.                         |
+| `HKEY_CURRENT_CONFIG` | **HKCC**     | Chứa thông tin về cấu hình phần cứng hiện tại.                                                     |
+
+### Một số Hive thường gặp trong thực tế
+
+#### `HKEY_CURRENT_USER (HKCU)`
+
+Chứa cấu hình dành riêng cho user hiện tại.
+
+Ví dụ:
+
+```text
+HKEY_CURRENT_USER\Software
+```
+
+Một số ứng dụng lưu các thiết lập cá nhân của người dùng bên dưới nhánh này.
+
+---
+
+#### `HKEY_LOCAL_MACHINE (HKLM)`
+
+Chứa các thiết lập áp dụng cho toàn bộ hệ thống.
+
+Một số nhánh thường gặp:
+
+```text
+HKEY_LOCAL_MACHINE\SOFTWARE
+HKEY_LOCAL_MACHINE\SYSTEM
+HKEY_LOCAL_MACHINE\SECURITY
+HKEY_LOCAL_MACHINE\SAM
+```
+
+Đây là Hive đặc biệt quan trọng khi phân tích hệ thống Windows vì có thể chứa thông tin về:
+
+* Phần mềm đã cài đặt
+* Services
+* Drivers
+* Cấu hình hệ thống
+* Các thiết lập bảo mật
+
+---
+
+#### `HKEY_CLASSES_ROOT (HKCR)`
+
+Được sử dụng để quản lý:
+
+* File associations
+* File extensions
+* COM class registrations
+
+Ví dụ:
+
+```text
+HKEY_CLASSES_ROOT\.txt
+```
+
+Key này liên quan đến cách Windows xử lý file có phần mở rộng `.txt`.
+
+---
+
+#### `HKEY_USERS (HKU)`
+
+Chứa các Registry configuration của user profiles được load.
+
+Ví dụ:
+
+```text
+HKEY_USERS\.DEFAULT
+HKEY_USERS\S-1-5-21-...
+```
+
+Các SID dạng `S-1-5-21-...` thường tương ứng với các user hoặc profile cụ thể.
+
+---
+
+#### `HKEY_CURRENT_CONFIG (HKCC)`
+
+Cung cấp thông tin về hardware profile hiện tại.
+
+Thông thường có thể xem nó như một shortcut đến thông tin cấu hình phần cứng trong:
+
+```text
+HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Hardware Profiles\Current
+```
+
+---
+
+## 4. Các kiểu dữ liệu phổ biến
+
+Registry hỗ trợ nhiều kiểu dữ liệu khác nhau. Một số kiểu thường gặp:
+
+| Kiểu dữ liệu        | Mô tả                                    | Ví dụ                   |
+| :------------------ | :--------------------------------------- | :---------------------- |
+| **`REG_SZ`**        | Chuỗi văn bản tiêu chuẩn (String).       | `C:\Windows`            |
+| **`REG_EXPAND_SZ`** | Chuỗi có thể chứa Environment Variables. | `%SystemRoot%\System32` |
+| **`REG_DWORD`**     | Số nguyên 32-bit.                        | `0`, `1`, `100`         |
+| **`REG_QWORD`**     | Số nguyên 64-bit.                        | `123456789`             |
+| **`REG_MULTI_SZ`**  | Chứa nhiều chuỗi văn bản.                | Nhiều giá trị string    |
+| **`REG_BINARY`**    | Dữ liệu nhị phân (Binary Data).          | `01 00 00 00`           |
+
+### Ví dụ
+
+Một Registry Value có thể có dạng:
+
+```text
+Name:  Enabled
+Type:  REG_DWORD
+Data:  1
+```
+
+Trong trường hợp này:
+
+* **Name** = `Enabled`
+* **Type** = `REG_DWORD`
+* **Data** = `1`
+
+Ứng dụng có thể sử dụng giá trị này để xác định một tính năng đang được bật.
+
+---
+
+## 5. Quản lý Registry với Registry Editor (regedit)
+
+Windows tích hợp sẵn công cụ đồ họa **Registry Editor** (`regedit.exe`) để xem và chỉnh sửa Registry.
+
+### Cách mở Registry Editor
+
+Có thể mở Registry Editor bằng một trong các cách sau:
+
+**Cách 1: Sử dụng Run**
+
+1. Nhấn `Win + R`.
+2. Nhập:
+
+```text
+regedit
+```
+
+3. Nhấn **Enter** hoặc chọn **OK**.
+4. Nếu User Account Control (UAC) xuất hiện, xác nhận quyền phù hợp.
+
+**Cách 2: Sử dụng Start Menu**
+
+Tìm kiếm:
+
+```text
+Registry Editor
+```
+
+Sau đó mở ứng dụng.
+
+---
+
+### Giao diện Registry Editor
+
+Registry Editor thường được chia thành hai khu vực chính:
+
+#### Left Pane
+
+Ngăn bên trái hiển thị cây Registry:
+
+```text
+HKEY_LOCAL_MACHINE
+├── HARDWARE
+├── SAM
+├── SECURITY
+├── SOFTWARE
+└── SYSTEM
+```
+
+Tại đây có thể mở rộng Hive và các Key để duyệt cấu trúc Registry.
+
+#### Right Pane
+
+Ngăn bên phải hiển thị các Registry Values của Key đang được chọn.
+
+Ví dụ:
+
+```text
+Name          Type          Data
+----          ----          ----
+Path          REG_SZ        C:\Windows
+Enabled       REG_DWORD      0x00000001
+```
+
+#### Address Bar
+
+Các phiên bản Windows hiện đại của Registry Editor có Address Bar cho phép nhập trực tiếp đường dẫn Registry.
+
+Ví dụ:
+
+```text
+HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion
+```
+
+---
+
+### Tạo một Registry Value
+
+Trong một Key:
+
+1. Nhấn chuột phải vào vùng trống ở **Right Pane**.
+2. Chọn **New**.
+3. Chọn kiểu dữ liệu cần tạo.
+4. Đặt tên cho Value.
+5. Nhấn Enter.
+6. Double-click vào Value để nhập Data.
+
+Ví dụ tạo một `REG_DWORD`:
+
+```text
+Name: Enabled
+Type: REG_DWORD
+Data: 1
+```
+
+---
+
+### Sao lưu Registry
+
+Trước khi chỉnh sửa Registry, nên tạo bản sao lưu.
+
+Trong Registry Editor:
+
+1. Chọn Hive hoặc Key cần sao lưu.
+2. Chọn **File → Export**.
+3. Chọn vị trí lưu file.
+4. Đặt tên cho file.
+5. Chọn **Save**.
+
+File backup thường có phần mở rộng:
+
+```text
+.reg
+```
+
+Ví dụ:
+
+```text
+registry-backup.reg
+```
+
+Có thể sử dụng file `.reg` để import lại các thiết lập đã được export.
+
+> ⚠️ **Lưu ý:** Không nên chỉnh sửa hoặc xóa Registry Value nếu chưa hiểu rõ chức năng của nó. Đặc biệt cẩn thận với các Key thuộc `HKLM\SYSTEM`, `HKLM\SECURITY` và các cấu hình quan trọng của hệ điều hành.
+
+---
+
+## Tóm tắt
+
+| Thành phần  | Ý nghĩa                              |
+| :---------- | :----------------------------------- |
+| **Hive**    | Cấp cao nhất của Registry            |
+| **Key**     | Tương tự thư mục                     |
+| **Subkey**  | Key con nằm bên trong một Key khác   |
+| **Value**   | Dữ liệu cấu hình được lưu trong Key  |
+| **Name**    | Tên của Registry Value               |
+| **Type**    | Kiểu dữ liệu của Value               |
+| **Data**    | Dữ liệu thực tế của Value            |
+| **Regedit** | Công cụ GUI dùng để quản lý Registry |
+
+### Các Hive cần nhớ
+
+```text
+HKCU → HKEY_CURRENT_USER
+HKLM → HKEY_LOCAL_MACHINE
+HKCR → HKEY_CLASSES_ROOT
+HKU  → HKEY_USERS
+HKCC → HKEY_CURRENT_CONFIG
+```
+
+### Các Registry Data Type cần nhớ
+
+```text
+REG_SZ
+REG_EXPAND_SZ
+REG_DWORD
+REG_QWORD
+REG_MULTI_SZ
+REG_BINARY
+```
+
