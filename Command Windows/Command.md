@@ -58,10 +58,13 @@ C:\ (System Drive)
     * [4. Kết nối ẩn danh (Anonymous/Guest)](#4-kết-nối-ẩn-danh-anonymousguest)
     * [5. Kết nối từ máy thuộc Domain mạng doanh nghiệp](#5-kết-nối-từ-máy-thuộc-domain-mạng-doanh-nghiệp)
     * [6. Các lệnh thao tác khi kết nối thành công](#6-các-lệnh-thao-tác-khi-kết-nối-thành-công)
-
-  
-
-
+* ⚙️ [Windows Registry](#windows-registry)
+    * [1. Khái niệm và Vai trò](#1-khái-niệm-và-vai-trò)
+    * [2. Cấu trúc Registry (Hives, Keys, Values)](#2-cấu-trúc-registry-hives-keys-values)
+    * [3. Các Registry Hives chính](#3-các-registry-hives-chính)
+    * [4. Các kiểu dữ liệu phổ biến](#4-các-kiểu-dữ-liệu-phổ-biến)
+    * [5. Quản lý Registry với Registry Editor (regedit)](#5-quản-lý-registry-với-registry-editor-regedit)
+    * [6. Bài thực hành: Tạo Key và Value cơ bản](#6-bài-thực-hành-tạo-key-và-value-cơ-bản)
 ---
 
 ## 📁 Thao tác với Thư mục
@@ -354,3 +357,35 @@ Sau khi kết nối thành công, giao diện sẽ đổi thành `smb: \>`. Bạ
 | **`rm`** | Xóa file trên máy chủ từ xa | `smb: \> rm ThongTinCu.txt` |
 | **`exit`** | Thoát khỏi giao diện smbclient | `smb: \> exit` |
 
+## ⚙️ Windows Registry
+
+### 1. Khái niệm & Vai trò
+**Windows Registry** là cơ sở dữ liệu phân cấp trung tâm được Windows và hầu hết các ứng dụng lưu trữ thông tin cấu hình. Registry chứa toàn bộ các thiết lập liên quan đến:
+* Hồ sơ người dùng (User Profiles)
+* Cấu hình phần mềm, phần cứng
+* Các dịch vụ hệ thống (Services)
+* Chính sách bảo mật (Security Policies)
+* Các thiết lập tùy chỉnh của hệ điều hành
+
+> ⚠️ **Lưu ý quan trọng:** Bất kỳ sai sót nào khi chỉnh sửa Registry đều có thể khiến ứng dụng hoặc các thành phần của Windows bị lỗi. Bạn nên luôn kiểm tra trên môi trường Lab/máy ảo hoặc sao lưu trước khi thực hiện thay đổi.
+
+---
+
+### 2. Cấu trúc Registry (Hives, Keys, Values)
+Registry được tổ chức theo mô hình cây phân cấp tương tự như thư mục và tệp tin trong hệ thống tệp Windows:
+
+| Thành phần | Mô tả | Tương đương trong File System |
+| :--- | :--- | :--- |
+| **Hive** | Phần cao nhất của Registry, chứa nhóm các thiết lập hệ thống hoặc user. | Ổ đĩa (`C:\`, `D:\`) |
+| **Key** | Thư mục chứa bên trong Hive. Một Key có thể chứa các Key con hoặc Value. | Thư mục (Folder) |
+| **Subkey** | Thẻ/Key nằm bên trong một Key khác để tổ chức cấu hình. | Thư mục con (Subfolder) |
+| **Value** | Giá trị cấu hình cụ thể nằm trong Key. | Tập tin (File) |
+
+#### Một Registry Value bao gồm 3 thành phần chính:
+1. **Name:** Tên định danh thiết lập.
+2. **Type:** Kiểu dữ liệu lưu trữ.
+3. **Data:** Giá trị dữ liệu cấu hình thực tế.
+
+*Ví dụ về đường dẫn Registry:*
+```text
+HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion
