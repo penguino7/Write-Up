@@ -33,22 +33,25 @@ C:\ (System Drive)
 ```
 
 ## Table of Contents
-* [📁 Thao tác với Thư mục](#-thao-tác-với-thư-mục)
-  * [1. Xem thư mục hiện tại](#1-xem-thư-mục-hiện-tại)
-  * [2. Liệt kê nội dung thư mục](#2-liệt-kê-nội-dung-thư-mục)
-  * [3. Xem cấu trúc cây thư mục](#3-xem-cấu-trúc-cây-thư-mục)
-  * [4. Chuyển đổi thư mục](#4-chuyển-đổi-thư-mục)
-  * [5. Tạo thư mục mới](#5-tạo-thư-mục-mới)
-  * [6. Xóa thư mục](#6-xóa-thư-mục)
-  * [7. Đổi tên hoặc Di chuyển thư mục](#7-đổi-tên-hoặc-di-chuyển-thư-mục)
-  * [8. Sao chép thư mục](#8-sao-chép-thư-mục)
-* [📄 Thao tác với File](#-thao-tác-với-file)
-  * [1. Tạo file mới](#1-tạo-file-mới)
-  * [2. Xem nội dung file](#2-xem-nội-dung-file)
-  * [3. Sao chép file](#3-sao-chép-file)
-  * [4. Di chuyển & Đổi tên file](#4-di-chuyển--đổi-tên-file)
-  * [5. Xóa file](#5-xóa-file)
-  * [6. Tìm kiếm trong file](#6-tìm-kiếm-trong-file)
+
+* 📁 [Thao tác với Thư mục](#thao-tác-với-thư-mục)
+    * [1. Xem thư mục hiện tại](#1-xem-thư-mục-hiện-tại)
+    * [2. Liệt kê nội dung thư mục](#2-liệt-kê-nội-dung-thư-mục)
+    * [3. Xem cấu trúc cây thư mục](#3-xem-cấu-trúc-cây-thư-mục)
+    * [4. Chuyển đổi thư mục](#4-chuyển-đổi-thư-mục)
+    * [5. Tạo thư mục mới](#5-tạo-thư-mục-mới)
+    * [6. Xóa thư mục](#6-xóa-thư-mục)
+    * [7. Đổi tên hoặc Di chuyển thư mục](#7-đổi-tên-hoặc-di-chuyển-thư-mục)
+    * [8. Sao chép thư mục](#8-sao-chép-thư-mục)
+    * [9. Quản lý quyền truy cập bằng icacls](#9-quản-lý-quyền-truy-cập-bằng-icacls)
+* 📄 [Thao tác với File](#thao-tác-với-file)
+    * [1. Tạo file mới](#1-tạo-file-mới)
+    * [2. Xem nội dung file](#2-xem-nội-dung-file)
+    * [3. Sao chép file](#3-sao-chép-file)
+    * [4. Di chuyển & Đổi tên file](#4-di-chuyển--đổi-tên-file)
+    * [5. Xóa file](#5-xóa-file)
+    * [6. Tìm kiếm trong file](#6-tìm-kiếm-trong-file)
+
 
 ---
 
@@ -145,6 +148,70 @@ C:\ (System Drive)
 | **PowerShell** | `Copy-Item Nguon Dich -Recurse` | Sao chép đệ quy toàn bộ thư mục con |
 
 ---
+
+### 9. Quản lý quyền truy cập bằng icacls
+
+`icacls` (Integrity Control Access Control List) là công cụ dòng lệnh mạnh mẽ trên Windows dùng để xem, sửa đổi, sao lưu và khôi phục danh sách kiểm soát truy cập (ACL) của tệp tin và thư mục.
+
+> ⚠️ **Lưu ý:** Bạn phải chạy Command Prompt (CMD) hoặc PowerShell với quyền **Administrator** để thực thi các lệnh này.
+
+#### Các cờ (Flags) điều khiển phổ biến
+* `/grant`: Cấp quyền cho một người dùng hoặc nhóm cụ thể.
+* `/deny`: Từ chối quyền một cách rõ ràng (Quyền deny luôn được ưu tiên trước quyền grant).
+* `/remove`: Xóa bỏ phân quyền của một người dùng/nhóm khỏi danh sách.
+* `/reset`: Đặt lại quyền về mặc định (sử dụng các quyền thừa hưởng từ thư mục cha).
+* `/t`: Áp dụng lệnh cho thư mục hiện tại và tất cả các thư mục/tệp tin con bên trong nó (Đệ quy).
+* `/c`: Tiếp tục thực hiện lệnh ngay cả khi gặp lỗi tệp tin (ví dụ: lỗi Access Denied ở một file lẻ).
+
+#### Các ký hiệu quyền hạn (Permissions)
+* `F` (Full Control): Toàn quyền (Đọc, ghi, xóa, sửa và thay đổi phân quyền).
+* `M` (Modify): Quyền sửa đổi, xóa tệp nhưng không được thay đổi cấu hình bảo mật.
+* `RX` (Read and Execute): Chỉ được đọc và chạy các tệp thực thi.
+* `R` (Read): Chỉ được phép xem nội dung.
+* `W` (Write): Chỉ được phép ghi hoặc thay đổi nội dung bên trong.
+
+#### Các lệnh mẫu thực tế
+
+* **Xem phân quyền hiện tại của thư mục:**
+  ```cmd
+  icacls "C:\Thư_Mục_Của_Bạn"
+  ```
+
+* **Cấp toàn quyền (Full Control) cho một User cụ thể (ví dụ: `Administrator`):**
+  ```cmd
+  icacls "C:\Data" /grant Administrator:F
+  ```
+
+* **Cấp quyền Đọc và Ghi cho User áp dụng cho cả các thư mục con bên trong (`/t`):**
+  ```cmd
+  icacls "C:\Data" /grant Username:(R,W) /t
+  ```
+
+* **Chặn quyền truy cập (Deny) của một User:**
+  ```cmd
+  icacls "C:\Data" /deny BadUser:F
+  ```
+
+* **Xóa bỏ cấu hình phân quyền riêng của một User (Trả lại trạng thái như chưa từng phân quyền):**
+  ```cmd
+  icacls "C:\Data" /remove Username
+  ```
+
+* **Khôi phục thư mục về quyền mặc định (Thừa hưởng từ thư mục cha):**
+  ```cmd
+  icacls "C:\Data" /reset /t
+  ```
+
+* **Sao lưu toàn bộ cấu hình quyền của thư mục ra một file text:**
+  ```cmd
+  icacls "C:\Data" /save "C:\Backup\acl_backup.txt" /t
+  ```
+
+* **Khôi phục lại quyền từ file sao lưu trước đó:**
+  ```cmd
+  icacls "C:\Data" /restore "C:\Backup\acl_backup.txt"
+  ```
+
 
 ## 📄 Thao tác với File
 
