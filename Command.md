@@ -55,3 +55,7 @@
 *   **Danh sách thông tin đăng nhập mặc định:** [SecLists Default Credentials](https://github.com)
 *   **Tài khoản mặc định của hệ thống điều khiển công nghiệp (ICS/SCADA):** [SCADAPASS](https://github.com)
 *   **Dữ liệu tên các thành phố trên thế giới:** [World Cities Dataset](https://github.com)
+
+echo -n ... -> cờ -n sẽ bó ký tự xuống dòng 
+base64 -w 0 -> ép các ký tự phải ở trên  một dòng duy nhất
+tr -d ' -' -> Xóa toàn bộ dấu cách và dấu -
