@@ -59,3 +59,5 @@
 echo -n ... -> cờ -n sẽ bó ký tự xuống dòng 
 base64 -w 0 -> ép các ký tự phải ở trên  một dòng duy nhất
 tr -d ' -' -> Xóa toàn bộ dấu cách và dấu -
+
+Mã hóa nội dung và lấy nội dung : <!ENTITY company SYSTEM "php://filter/read=convert.base64-encode/resource=index.php">
