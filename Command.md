@@ -181,3 +181,5 @@ Chèn đoạn mã khai thác sau vào phần tiêu đề XML (`<!DOCTYPE ...>`) 
 * **Danh sách thông tin đăng nhập mặc định:** [SecLists Default Credentials](https://github.com)
 * **Tài khoản mặc định của hệ thống điều khiển công nghiệp (ICS/SCADA):** [SCADAPASS](https://github.com)
 * **Dữ liệu tên các thành phố trên thế giới:** [World Cities Dataset](https://github.com)
+
+Tool xxe : XXEinjector
