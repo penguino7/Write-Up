@@ -14,6 +14,7 @@ Một bảng tra cứu nhanh (Cheat Sheet) các lệnh hữu ích phục vụ ch
    * [Khai thác Nâng cao bằng CDATA và External DTD](#khai-thác-nâng-cao-bằng-cdata-và-external-dtd)
    * [Tự động hóa với XXEinjector](#tự-động-hóa-với-xxeinjector)
 6. [Tài Nguyên & Danh Sách Hữu Ích (Wordlists & Datasets)](#6-tài-nguyên--danh-sách-hữu-ích-wordlists--datasets)
+7. [PHP Wrappers (Luồng Dữ Liệu PHP)](#7-php-wrappers-luồng-dữ-liệu-php)
 
 ---
 
@@ -212,6 +213,54 @@ Content-Type: application/xml
 | `--oob` | Giao thức Out-of-Band sử dụng (`http`, `ftp`, `gopher`). |
 | `--phpfilter` | Bật bộ lọc mã hóa Base64 của PHP để tránh lỗi ký tự đặc biệt. |
 | `--ssl` | Bật chế độ hỗ trợ SSL/HTTPS cho gói tin gửi đi. |
+
+---
+
+## 7. PHP Wrappers (Luồng Dữ Liệu PHP)
+
+PHP Wrappers là các giao thức luồng dữ liệu tích hợp sẵn trong PHP, cho phép truy cập nhiều loại tài nguyên khác nhau thông qua cú pháp thống nhất. Chúng vừa là công cụ lập trình hợp lệ, vừa là vector tấn công nguy hiểm nếu ứng dụng không kiểm soát đầu vào.
+
+### `php://input` — Đọc dữ liệu thô từ Request
+
+**Lập trình viên dùng để:** Đọc các dữ liệu thô gửi lên từ client, phổ biến nhất là dữ liệu dạng JSON khi viết API (như ví dụ sử dụng `json_decode`).
+
+**Hacker dùng để (RCE):** Nếu ứng dụng dính lỗi LFI dạng `include($_GET['page'])`, hacker có thể truyền vào `?page=php://input` và nhét mã độc PHP vào phần Body của Request. Hàm `include` sẽ đọc luồng dữ liệu thô này và thực thi ngay lập tức lệnh hệ thống trên máy chủ.
+
+```http
+GET /index.php?page=php://input HTTP/1.1
+...
+
+<?php system('whoami'); ?>
+```
+
+---
+
+### `php://filter` — Bộ lọc luồng dữ liệu
+
+**Lập trình viên dùng để:** Biến đổi dữ liệu của một file ngay khi vừa mở ra. Ví dụ: Tự động chuyển toàn bộ văn bản trong file thành chữ IN HOA (`string.toupper`) trước khi đọc.
+
+**Hacker dùng để (Đọc mã nguồn):** Sử dụng bộ lọc `convert.base64-encode` để buộc hệ thống đổi file PHP thành chuỗi Base64, vượt qua cơ chế thực thi của `include()`, từ đó tải được mã nguồn gốc của trang web về máy.
+
+```
+php://filter/read=convert.base64-encode/resource=index.php
+```
+
+---
+
+### `php://stdin`, `php://stdout`, `php://stderr` — Luồng vào/ra tiêu chuẩn
+
+**Lập trình viên dùng để:** Tương tác trực tiếp với giao diện dòng lệnh (Terminal/CLI). Nhận dữ liệu nhập vào từ bàn phím hoặc in lỗi ra màn hình Terminal của máy chủ.
+
+**Bảo mật:** Ít khi bị khai thác qua lỗi Web, nhưng hữu ích khi viết các công cụ mã độc chạy ngầm (Backdoor) hoạt động trực tiếp trên Terminal.
+
+---
+
+### `php://memory` và `php://temp` — Lưu trữ tạm thời
+
+**Lập trình viên dùng để:** Tạo ra một vùng không gian lưu trữ dữ liệu tạm thời giống như một file, nhưng dữ liệu được lưu trực tiếp trên RAM thay vì ghi xuống ổ cứng — giúp tăng tốc độ xử lý và tự xóa sạch khi tắt chương trình.
+
+> [!NOTE]
+> `php://temp` tự động chuyển sang ghi file tạm trên ổ cứng khi dữ liệu vượt quá ngưỡng mặc định (2MB), trong khi `php://memory` luôn giữ toàn bộ dữ liệu trên RAM.
 
 ---
 
