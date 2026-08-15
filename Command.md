@@ -15,6 +15,7 @@ Một bảng tra cứu nhanh (Cheat Sheet) các lệnh hữu ích phục vụ ch
    * [Tự động hóa với XXEinjector](#tự-động-hóa-với-xxeinjector)
 6. [Tài Nguyên & Danh Sách Hữu Ích (Wordlists & Datasets)](#6-tài-nguyên--danh-sách-hữu-ích-wordlists--datasets)
 7. [PHP Wrappers (Luồng Dữ Liệu PHP)](#7-php-wrappers-luồng-dữ-liệu-php)
+8. [PHP Stream Filters (Bộ Lọc Luồng PHP)](#8-php-stream-filters-bộ-lọc-luồng-php)
 
 ---
 
@@ -261,6 +262,58 @@ php://filter/read=convert.base64-encode/resource=index.php
 
 > [!NOTE]
 > `php://temp` tự động chuyển sang ghi file tạm trên ổ cứng khi dữ liệu vượt quá ngưỡng mặc định (2MB), trong khi `php://memory` luôn giữ toàn bộ dữ liệu trên RAM.
+
+---
+
+## 8. PHP Stream Filters (Bộ Lọc Luồng PHP)
+
+Đây là danh mục các từ khóa có thể nhét vào sau `php://filter/read=` để biến đổi dữ liệu. Tham khảo đầy đủ tại [List of Available Filters - PHP Manual](https://www.php.net/manual/en/filters.php).
+
+### Nhóm 1: Conversion Filters (Bộ lọc chuyển đổi)
+
+Nhóm quan trọng nhất trong khai thác LFI, dùng để thay đổi hoàn toàn cách mã hóa dữ liệu của file.
+
+| Bộ lọc | Mô tả |
+| :--- | :--- |
+| `convert.base64-encode` | Mã hóa file sang Base64 — hacker dùng để "đóng băng" code PHP, tải mã nguồn về mà không để server thực thi. |
+| `convert.base64-decode` | Giải mã chuỗi Base64 ngược lại thành dữ liệu gốc. |
+| `convert.quoted-printable-encode` | Chuyển văn bản sang định dạng Quoted-Printable (dùng trong mã hóa email). |
+| `convert.iconv.*` | Chuyển đổi bảng mã văn bản (UTF-8 → UTF-16, ISO-8859-1...). |
+
+> [!TIP]
+> **PHP Filter Chain (Kỹ thuật nâng cao):** Nối chuỗi liên tiếp hàng chục bộ lọc `convert.iconv` khác nhau để tự sinh ra mã độc thực thi RCE trên server mà không cần đọc bất kỳ file nào có sẵn.
+
+---
+
+### Nhóm 2: String Filters (Bộ lọc chuỗi)
+
+Dùng để xử lý, định dạng nhanh các ký tự chữ trong luồng dữ liệu.
+
+| Bộ lọc | Mô tả |
+| :--- | :--- |
+| `string.toupper` | Chuyển toàn bộ văn bản thành chữ IN HOA. |
+| `string.tolower` | Chuyển toàn bộ văn bản thành chữ thường. |
+| `string.rot13` | Mã hóa bằng thuật toán ROT13 (dịch chuyển 13 ký tự). Hacker dùng thay thế Base64 nếu hệ thống chặn từ khóa `base64`. |
+| `string.strip_tags` | Loại bỏ toàn bộ thẻ HTML và thẻ PHP (`<?php ?>`) khỏi dữ liệu. |
+
+---
+
+### Nhóm 3: Compression Filters (Bộ lọc nén)
+
+Nén hoặc giải nén dữ liệu ngay trong quá trình đọc — hữu ích khi đọc file log dung lượng lớn đã được nén trên máy chủ.
+
+| Bộ lọc | Mô tả |
+| :--- | :--- |
+| `zlib.deflate` | Nén luồng dữ liệu bằng thuật toán Zlib. |
+| `zlib.inflate` | Giải nén luồng dữ liệu Zlib. |
+| `bzip2.compress` | Nén bằng thuật toán Bzip2. |
+| `bzip2.decompress` | Giải nén Bzip2. |
+
+---
+
+### Nhóm 4: Encryption Filters (Bộ lọc mã hóa)
+
+Tích hợp thuật toán mã hóa để che giấu dữ liệu khi ghi vào file. Trước đây phổ biến với các bộ lọc `mcrypt.*` và `mdecrypt.*` dựa trên thư viện MCrypt, tuy nhiên nhóm này đã bị **loại bỏ hoàn toàn** ở các phiên bản PHP hiện đại do thư viện MCrypt quá lỗi thời.
 
 ---
 
