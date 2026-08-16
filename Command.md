@@ -333,3 +333,9 @@ List log LFI poisioning : https://github.com/danielmiessler/SecLists/tree/master
 Fuzzing paramater : https://github.com/danielmiessler/SecLists/blob/master/Discovery/Web-Content/burp-parameter-names.txt
 
 Webroot linux : https://github.com/danielmiessler/SecLists/blob/master/Discovery/Web-Content/default-web-root-directory-linux.txt
+
+Tool LFI : 
+https://github.com/D35m0nd142/LFISuite
+https://github.com/OsandaMalith/LFiFreak
+https://github.com/mzfr/liffy
+
