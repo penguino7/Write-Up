@@ -331,3 +331,5 @@ lệnh netcat : nc -lvnp port_listen
 List log LFI poisioning : https://github.com/danielmiessler/SecLists/tree/master/Fuzzing/LFI/Linux
 
 Fuzzing paramater : https://github.com/danielmiessler/SecLists/blob/master/Discovery/Web-Content/burp-parameter-names.txt
+
+Webroot linux : https://github.com/danielmiessler/SecLists/blob/master/Discovery/Web-Content/default-web-root-directory-linux.txt
