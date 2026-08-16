@@ -338,4 +338,4 @@ Tool LFI :
 https://github.com/D35m0nd142/LFISuite
 https://github.com/OsandaMalith/LFiFreak
 https://github.com/mzfr/liffy
-
+=> lỗi thời rồi
