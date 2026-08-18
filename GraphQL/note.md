@@ -15,6 +15,7 @@ Tài liệu này tổng hợp toàn bộ lộ trình kiến thức về GraphQL,
 * [8. Công Cụ Trực Quan Hóa API: GraphiQL IDE](#8-công-cụ-trực-quan-hóa-api-graphiql-ide)
 * [9. Kiến Thức Introspection Trong GraphQL](#9-kiến-thức-introspection-trong-graphql)
 * [10. Kiến Thức Về Mutations Và Kiểm Thử Lạm Dụng Mutation](#10-kiến-thức-về-mutations-và-kiểm-thử-lạm-dụng-mutation)
+* [11. Công Cụ Kiểm Thử GraphQL: graphql-cop Và InQL](#11-công-cụ-kiểm-thử-graphql-graphql-cop-và-inql)
 
 ---
 
@@ -571,5 +572,79 @@ async function registerUser(_, { input }, context) {
 ```
 
 Trong ví dụ trên, dù client cố gửi `role: ADMIN`, resolver vẫn không dùng giá trị đó. Quyền được gán ở server theo luật nghiệp vụ, không lấy từ request.
+
+[⬆ Quay lại mục lục](#-mục-lục-dễ-tra-cứu)
+
+---
+
+## 11. Công Cụ Kiểm Thử GraphQL: graphql-cop Và InQL
+Ngoài `graphw00f`, `GraphiQL`, Postman và GraphQL Voyager, khi kiểm thử bảo mật GraphQL có thể dùng thêm các công cụ chuyên biệt để tự động hóa việc phân tích endpoint, schema và các lỗi cấu hình phổ biến.
+
+> **Lưu ý:** Chỉ dùng các công cụ này với hệ thống của chính bạn, môi trường lab hoặc phạm vi kiểm thử đã được cho phép.
+
+### graphql-cop
+Repository:
+
+```text
+https://github.com/dolevf/graphql-cop
+```
+
+**graphql-cop** là công cụ Python dùng để chạy nhiều kiểm tra bảo mật phổ biến trên GraphQL API. Công cụ này phù hợp khi muốn rà nhanh một endpoint xem có bật các hành vi rủi ro hay không.
+
+Các nhóm kiểm tra thường gặp:
+
+*   **Introspection:** Kiểm tra endpoint có cho phép dump schema hay không.
+*   **Alias/Batch abuse:** Kiểm tra khả năng gửi nhiều query hoặc alias trong một request để khuếch đại tải.
+*   **Depth/Nesting:** Kiểm tra server có giới hạn độ sâu query hay không.
+*   **Field duplication:** Kiểm tra server xử lý các field bị lặp lại như thế nào.
+*   **Directive/Debug behavior:** Quan sát phản hồi lỗi và hành vi xử lý query đặc biệt.
+
+Ví dụ cách dùng cơ bản:
+
+```powershell
+python graphql-cop.py -t https://target-lab.local/graphql
+```
+
+Nếu endpoint cần header xác thực, thêm header theo hướng dẫn của tool:
+
+```powershell
+python graphql-cop.py -t https://target-lab.local/graphql -H "Authorization: Bearer <token>"
+```
+
+Khi đọc kết quả, không nên hiểu mọi cảnh báo là lỗ hổng chắc chắn. Hãy dùng kết quả như danh sách gợi ý để kiểm tra thủ công lại trong Postman/Burp, đặc biệt với các lỗi liên quan đến phân quyền, rate limit và business logic.
+
+### InQL
+Repository:
+
+```text
+https://github.com/doyensec/inql
+```
+
+**InQL** là công cụ phân tích GraphQL tích hợp với Burp Suite. Nó hỗ trợ thu thập schema, sinh query/mutation/subscription từ schema, và giúp tester thao tác trực tiếp với GraphQL endpoint trong luồng proxy.
+
+Các khả năng hữu ích:
+
+*   **Schema introspection:** Lấy schema từ endpoint GraphQL nếu server cho phép Introspection.
+*   **Generate operations:** Tự sinh query, mutation, subscription dựa trên schema để tester chỉnh sửa và gửi thử.
+*   **Burp workflow:** Dùng cùng Proxy, Repeater, Intruder và Scanner của Burp Suite.
+*   **Batch Queries:** Hỗ trợ kiểm tra nhiều query trong một request.
+*   **Engine Fingerprinting:** Hỗ trợ nhận diện dấu vết engine/framework GraphQL.
+*   **Voyager/GraphiQL view:** Giúp xem schema trực quan hoặc thao tác query tiện hơn ngay trong workflow kiểm thử.
+
+Quy trình dùng InQL ở mức tổng quan:
+
+1.  Cấu hình Burp Suite proxy để bắt traffic từ trình duyệt hoặc Postman.
+2.  Đăng nhập ứng dụng mục tiêu trong phạm vi được phép.
+3.  Gửi request tới endpoint GraphQL qua Burp.
+4.  Dùng InQL để chạy Introspection hoặc import schema đã có.
+5.  Sinh danh sách query/mutation rồi gửi từng request sang Repeater để kiểm thử thủ công.
+6.  Tập trung kiểm tra các mutation nhạy cảm như `updateUserRole`, `deleteUser`, `resetPassword`, `exportData`.
+
+### Khi nào dùng tool nào?
+*   **graphw00f:** Dùng sớm để nhận diện có phải GraphQL và framework có thể đang chạy phía sau.
+*   **graphql-cop:** Dùng để rà nhanh các lỗi cấu hình/hành vi nguy hiểm phổ biến.
+*   **InQL:** Dùng khi cần phân tích sâu trong Burp Suite, sinh request từ schema và kiểm thử thủ công.
+*   **GraphQL Voyager:** Dùng để nhìn schema dưới dạng graph, dễ hiểu quan hệ giữa các type.
+*   **Postman:** Dùng để gửi query/mutation rõ ràng, lưu collection và kiểm thử có kiểm soát.
 
 [⬆ Quay lại mục lục](#-mục-lục-dễ-tra-cứu)
