@@ -25,6 +25,8 @@ Tài liệu này tổng hợp toàn bộ lộ trình kiến thức về GraphQL,
 
 [⬆ Quay lại mục lục](#-mục-lục-dễ-tra-cứu)
 
+---
+
 ## 2. Bốn Thành Phần Cốt Lõi Trong Hệ Thống
 Để vận hành cấu trúc GraphQL, hệ thống bắt buộc phải xây dựng dựa trên 4 thành phần nền tảng:
 
