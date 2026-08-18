@@ -290,6 +290,63 @@ fragment TypeRef on __Type {
 
 Kết quả trả về thường khá dài, nhưng rất hữu ích để dựng lại tài liệu API, import vào công cụ kiểm thử hoặc tìm nhanh các query/mutation đáng chú ý trong quá trình đánh giá bảo mật.
 
+### Xem Schema trực quan bằng GraphQL Voyager
+**GraphQL Voyager** là công cụ giúp biểu diễn Schema GraphQL thành một sơ đồ tương tác dạng graph. Thay vì chỉ đọc JSON dài từ Introspection, ta có thể nhìn thấy các `type`, `field`, quan hệ object, enum, input và root query/mutation theo cách trực quan hơn.
+
+Link công cụ:
+
+```text
+https://apis.guru/graphql-voyager/
+```
+
+### Quy trình dùng Postman để gửi request và đưa vào Voyager
+1.  **Tạo request GraphQL trong Postman:**
+    *   Method thường dùng: `POST`.
+    *   URL: endpoint GraphQL, ví dụ `https://target.com/graphql`.
+    *   Headers:
+        ```http
+        Content-Type: application/json
+        Authorization: Bearer <token-neu-can>
+        ```
+
+2.  **Gửi Introspection Query:**
+    *   Trong Postman, chọn Body dạng GraphQL nếu có.
+    *   Hoặc dùng Body raw JSON:
+        ```json
+        {
+          "query": "query { __schema { queryType { name } types { name kind } } }"
+        }
+        ```
+    *   Với trường hợp cần dump đầy đủ Schema, dùng query `IntrospectionQuery` tổng quát ở phần trên.
+
+3.  **Lưu response JSON:**
+    *   Nếu server bật Introspection, response sẽ có dạng:
+        ```json
+        {
+          "data": {
+            "__schema": {
+              "queryType": {
+                "name": "Query"
+              }
+            }
+          }
+        }
+        ```
+    *   Copy toàn bộ response hoặc lưu ra file `.json`.
+
+4.  **Mở GraphQL Voyager:**
+    *   Truy cập `https://apis.guru/graphql-voyager/`.
+    *   Chọn tùy chọn nhập Schema/Introspection nếu giao diện hỗ trợ.
+    *   Dán JSON introspection lấy từ Postman hoặc trỏ trực tiếp tới endpoint GraphQL nếu endpoint cho phép truy cập từ trình duyệt.
+
+5.  **Phân tích sơ đồ:**
+    *   Bắt đầu từ root `Query`, `Mutation`, `Subscription`.
+    *   Tìm các object chứa dữ liệu nhạy cảm như `User`, `Account`, `Order`, `Payment`, `Token`, `Admin`.
+    *   Kiểm tra các mutation có tác động mạnh như tạo, sửa, xóa, reset, import/export dữ liệu.
+    *   Ghi lại field/argument đáng chú ý để kiểm thử phân quyền trong Postman.
+
+> **Lưu ý thực tế:** Nếu Voyager không gọi trực tiếp được endpoint do CORS, authentication hoặc network policy, hãy dùng Postman gửi Introspection Query trước, sau đó copy response JSON sang Voyager. Cách này ổn định hơn khi kiểm thử các API cần token.
+
 ### Ví dụ xem chi tiết một type
 ```graphql
 query {
