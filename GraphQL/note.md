@@ -477,6 +477,64 @@ Ví dụ raw JSON trong Postman:
 }
 ```
 
+### Query Introspection chỉ liệt kê Mutation
+Nếu không cần dump toàn bộ Schema, có thể dùng query dưới đây để tập trung lấy danh sách mutation mà Back-end hỗ trợ, kèm tên argument, giá trị mặc định và kiểu dữ liệu của từng argument.
+
+```graphql
+query {
+  __schema {
+    mutationType {
+      name
+      fields {
+        name
+        args {
+          name
+          defaultValue
+          type {
+            ...TypeRef
+          }
+        }
+      }
+    }
+  }
+}
+
+fragment TypeRef on __Type {
+  kind
+  name
+  ofType {
+    kind
+    name
+    ofType {
+      kind
+      name
+      ofType {
+        kind
+        name
+        ofType {
+          kind
+          name
+          ofType {
+            kind
+            name
+            ofType {
+              kind
+              name
+              ofType {
+                kind
+                name
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+Kết quả của query này giúp ta nhanh chóng biết hệ thống có các mutation nào như `registerUser`, `updateUser`, `deleteUser`, `resetPassword`, mỗi mutation nhận những tham số gì và tham số đó là scalar, enum, input object hay list. Đây là bước rất hữu ích trước khi kiểm thử phân quyền hoặc mass assignment trong phạm vi được phép.
+
 ### Dấu hiệu Mutation đáng chú ý khi đọc Schema
 Khi xem Schema bằng Introspection hoặc GraphQL Voyager, hãy chú ý các mutation có tên gợi ý quyền cao hoặc thay đổi dữ liệu nhạy cảm:
 
