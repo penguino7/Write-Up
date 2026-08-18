@@ -320,7 +320,7 @@ Tích hợp thuật toán mã hóa để che giấu dữ liệu khi ghi vào fil
 ## 6. Tài Nguyên & Danh Sách Hữu Ích (Wordlists & Datasets)
 
 * **Danh sách Username phổ biến:** [SecLists Usernames](https://github.com)
-* **Danh sách thông tin đăng nhập mặc định:** [SecLists Default Credentials](https://github.com)
+* **Danh sách thông tin đăng nhập mặc định:** [SecLists Default Credentials](https://github.com) 
 * **Tài khoản mặc định của hệ thống điều khiển công nghiệp (ICS/SCADA):** [SCADAPASS](https://github.com)
 * **Dữ liệu tên các thành phố trên thế giới:** [World Cities Dataset](https://github.com)
 
@@ -340,3 +340,5 @@ https://github.com/D35m0nd142/LFISuite
 https://github.com/OsandaMalith/LFiFreak
 https://github.com/mzfr/liffy
 => lỗi thời rồi
+Tool xác định dùng graphQL
+https://github.com/dolevf/graphw00f
