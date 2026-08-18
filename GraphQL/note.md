@@ -14,6 +14,7 @@ Tài liệu này tổng hợp toàn bộ lộ trình kiến thức về GraphQL,
 * [7. Công Cụ Nhận Diện Dấu Vết Hệ Thống: graphw00f](#7-công-cụ-nhận-diện-dấu-vết-hệ-thống-graphw00f)
 * [8. Công Cụ Trực Quan Hóa API: GraphiQL IDE](#8-công-cụ-trực-quan-hóa-api-graphiql-ide)
 * [9. Kiến Thức Introspection Trong GraphQL](#9-kiến-thức-introspection-trong-graphql)
+* [10. Kiến Thức Về Mutations Và Kiểm Thử Lạm Dụng Mutation](#10-kiến-thức-về-mutations-và-kiểm-thử-lạm-dụng-mutation)
 
 ---
 
@@ -377,5 +378,140 @@ Introspection rất tiện trong môi trường phát triển, nhưng có thể 
 *   **Development/Staging:** Có thể bật Introspection để lập trình viên dễ debug, viết query và đọc tài liệu tự động.
 *   **Production:** Nên tắt hoặc giới hạn Introspection theo quyền truy cập, ví dụ chỉ cho admin, internal network hoặc token đặc biệt.
 *   **Không dựa vào việc tắt Introspection như lớp bảo mật duy nhất:** Dù tắt Introspection, attacker vẫn có thể dò Schema bằng lỗi trả về, brute-force tên field hoặc quan sát request từ front-end. Resolver vẫn phải kiểm tra xác thực, phân quyền, giới hạn độ sâu query và giới hạn tốc độ gọi API.
+
+[⬆ Quay lại mục lục](#-mục-lục-dễ-tra-cứu)
+
+---
+
+## 10. Kiến Thức Về Mutations Và Kiểm Thử Lạm Dụng Mutation
+**Mutation** là nhóm thao tác dùng để thay đổi dữ liệu trên Server GraphQL, tương tự các hành động `POST`, `PUT`, `PATCH`, `DELETE` trong REST API. Nếu `Query` dùng để đọc dữ liệu, thì `Mutation` thường dùng cho các chức năng như đăng ký tài khoản, đăng nhập, đổi mật khẩu, cập nhật hồ sơ, tạo đơn hàng, thêm quyền, xóa dữ liệu hoặc reset trạng thái hệ thống.
+
+> **Phạm vi sử dụng:** Các ví dụ dưới đây chỉ nên dùng trong môi trường lab, hệ thống của chính bạn hoặc phạm vi kiểm thử đã được cho phép. Mục tiêu là hiểu lỗi thiết kế/phân quyền để phòng thủ và kiểm thử hợp lệ.
+
+### Cấu trúc Mutation cơ bản
+Một mutation thường gồm:
+
+*   **Tên mutation:** Ví dụ `registerUser`, `updateUser`, `deletePost`.
+*   **Input/argument:** Dữ liệu client gửi lên, ví dụ `email`, `password`, `displayName`.
+*   **Selection set:** Các field muốn server trả về sau khi xử lý.
+
+Ví dụ:
+
+```graphql
+mutation {
+  registerUser(input: {
+    email: "user@example.com"
+    password: "P@ssw0rd123"
+    displayName: "Normal User"
+  }) {
+    id
+    email
+    role
+  }
+}
+```
+
+### Vì sao Mutation dễ sinh lỗi bảo mật?
+Mutation nguy hiểm hơn query vì nó **thay đổi trạng thái hệ thống**. Một resolver mutation nếu tin dữ liệu client gửi lên quá mức có thể tạo ra các lỗi như:
+
+*   **Mass assignment:** Client gửi thêm field không nên được phép tự set, ví dụ `role`, `isAdmin`, `balance`, `verified`.
+*   **Broken access control:** User thường gọi được mutation chỉ dành cho admin, ví dụ `updateUserRole`, `deleteUser`, `exportOrders`.
+*   **IDOR/BOLA:** User sửa/xóa tài nguyên của người khác bằng cách đổi `userId`, `orderId`, `accountId`.
+*   **Business logic abuse:** Lạm dụng mutation đúng cú pháp nhưng sai luồng nghiệp vụ, ví dụ apply coupon nhiều lần, reset trạng thái đơn hàng, tự xác minh tài khoản.
+
+### Ví dụ lab: đăng ký user nhưng cố gửi role admin
+Một lỗi phổ biến là Schema cho phép input chứa field `role`, hoặc resolver tự động lưu toàn bộ object client gửi lên database mà không lọc field nhạy cảm.
+
+Ví dụ mutation bình thường:
+
+```graphql
+mutation RegisterNormalUser {
+  registerUser(input: {
+    email: "student@example.com"
+    password: "P@ssw0rd123"
+    displayName: "Student"
+  }) {
+    id
+    email
+    role
+  }
+}
+```
+
+Ví dụ payload kiểm thử trong lab: client cố gửi thêm quyền admin.
+
+```graphql
+mutation RegisterAdminAttempt {
+  registerUser(input: {
+    email: "admin-test@example.com"
+    password: "P@ssw0rd123"
+    displayName: "Admin Test"
+    role: ADMIN
+  }) {
+    id
+    email
+    role
+  }
+}
+```
+
+Nếu server trả về `role: ADMIN` hoặc tài khoản mới thật sự có quyền admin, đó là dấu hiệu lỗi phân quyền/mass assignment nghiêm trọng. Server an toàn phải bỏ qua field `role`, trả lỗi validation, hoặc luôn ép role mặc định là `USER` ở phía server.
+
+### Cách kiểm thử bằng Postman
+1.  Tạo request `POST` tới endpoint GraphQL, ví dụ `https://target-lab.local/graphql`.
+2.  Thêm header cần thiết:
+    ```http
+    Content-Type: application/json
+    Authorization: Bearer <token-neu-can>
+    ```
+3.  Chọn Body dạng GraphQL hoặc raw JSON.
+4.  Gửi mutation hợp lệ trước để hiểu response bình thường.
+5.  Gửi lại mutation với field nhạy cảm được thêm vào input, ví dụ `role`, `isAdmin`, `permissions`.
+6.  So sánh response và kiểm tra lại quyền thật sự của tài khoản trong phạm vi lab/ủy quyền.
+
+Ví dụ raw JSON trong Postman:
+
+```json
+{
+  "query": "mutation RegisterAdminAttempt { registerUser(input: { email: \"admin-test@example.com\", password: \"P@ssw0rd123\", displayName: \"Admin Test\", role: ADMIN }) { id email role } }"
+}
+```
+
+### Dấu hiệu Mutation đáng chú ý khi đọc Schema
+Khi xem Schema bằng Introspection hoặc GraphQL Voyager, hãy chú ý các mutation có tên gợi ý quyền cao hoặc thay đổi dữ liệu nhạy cảm:
+
+*   `createUser`, `registerUser`, `inviteUser`
+*   `updateUser`, `updateProfile`, `updateUserRole`
+*   `setRole`, `assignRole`, `grantPermission`
+*   `deleteUser`, `disableUser`, `resetPassword`
+*   `createOrder`, `updateOrderStatus`, `refundPayment`
+*   `uploadFile`, `importData`, `exportData`
+
+Các mutation này không mặc định là lỗ hổng. Chúng chỉ đáng kiểm tra kỹ vì nếu resolver thiếu xác thực/phân quyền thì tác động sẽ lớn.
+
+### Cách phòng thủ đúng ở Back-end
+*   **Không tin role từ client:** Role phải do server quyết định, ví dụ user mới luôn là `USER`.
+*   **Tách input public và input admin:** `RegisterUserInput` không nên có `role`; nếu cần đổi role, dùng mutation admin riêng như `adminUpdateUserRole`.
+*   **Kiểm tra quyền trong resolver:** Mỗi mutation nhạy cảm phải kiểm tra `currentUser`, role, ownership và scope.
+*   **Allowlist field được phép update:** Chỉ map các field an toàn từ input, không lưu thẳng toàn bộ object client gửi lên.
+*   **Validate enum và business rule:** Không chỉ kiểm tra đúng kiểu dữ liệu, mà còn phải kiểm tra user hiện tại có quyền dùng giá trị đó không.
+*   **Audit log:** Ghi lại các mutation nhạy cảm như đổi role, xóa user, refund, export dữ liệu.
+
+Ví dụ resolver an toàn về mặt tư duy:
+
+```javascript
+async function registerUser(_, { input }, context) {
+  const safeInput = {
+    email: input.email,
+    password: await hashPassword(input.password),
+    displayName: input.displayName,
+    role: "USER"
+  };
+
+  return db.user.create({ data: safeInput });
+}
+```
+
+Trong ví dụ trên, dù client cố gửi `role: ADMIN`, resolver vẫn không dùng giá trị đó. Quyền được gán ở server theo luật nghiệp vụ, không lấy từ request.
 
 [⬆ Quay lại mục lục](#-mục-lục-dễ-tra-cứu)
