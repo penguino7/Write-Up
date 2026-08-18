@@ -189,6 +189,107 @@ query {
 
 Query trên giúp Client nhìn thấy danh sách kiểu dữ liệu trong hệ thống. Nếu endpoint bật Introspection, Server sẽ trả về một JSON mô tả Schema thay vì dữ liệu nghiệp vụ như danh sách user hay sản phẩm.
 
+### Query Introspection tổng quát để dump Schema
+Khi kiểm thử bảo mật hợp lệ, việc biết toàn bộ query, mutation, field và type mà Back-end hỗ trợ giúp ta hiểu rõ bề mặt tấn công có thể kiểm tra. Từ đó, tester có thể nhận diện những chức năng nhạy cảm cần rà soát kỹ hơn, ví dụ field chứa thông tin cá nhân, mutation thay đổi dữ liệu, hoặc resolver có khả năng thiếu kiểm tra phân quyền.
+
+Đoạn query tổng quát dưới đây thường được dùng để dump gần như toàn bộ thông tin Schema mà cơ chế Introspection cho phép trả về:
+
+```graphql
+query IntrospectionQuery {
+  __schema {
+    queryType { name }
+    mutationType { name }
+    subscriptionType { name }
+    types {
+      ...FullType
+    }
+    directives {
+      name
+      description
+      locations
+      args {
+        ...InputValue
+      }
+    }
+  }
+}
+
+fragment FullType on __Type {
+  kind
+  name
+  description
+  fields(includeDeprecated: true) {
+    name
+    description
+    args {
+      ...InputValue
+    }
+    type {
+      ...TypeRef
+    }
+    isDeprecated
+    deprecationReason
+  }
+  inputFields {
+    ...InputValue
+  }
+  interfaces {
+    ...TypeRef
+  }
+  enumValues(includeDeprecated: true) {
+    name
+    description
+    isDeprecated
+    deprecationReason
+  }
+  possibleTypes {
+    ...TypeRef
+  }
+}
+
+fragment InputValue on __InputValue {
+  name
+  description
+  type { ...TypeRef }
+  defaultValue
+}
+
+fragment TypeRef on __Type {
+  kind
+  name
+  ofType {
+    kind
+    name
+    ofType {
+      kind
+      name
+      ofType {
+        kind
+        name
+        ofType {
+          kind
+          name
+          ofType {
+            kind
+            name
+            ofType {
+              kind
+              name
+              ofType {
+                kind
+                name
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+Kết quả trả về thường khá dài, nhưng rất hữu ích để dựng lại tài liệu API, import vào công cụ kiểm thử hoặc tìm nhanh các query/mutation đáng chú ý trong quá trình đánh giá bảo mật.
+
 ### Ví dụ xem chi tiết một type
 ```graphql
 query {
