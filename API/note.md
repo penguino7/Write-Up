@@ -23,6 +23,11 @@
   - [Tại sao bị lỗi?](#tại-sao-bị-lỗi-3)
   - [Các cách khai thác](#các-cách-khai-thác-3)
   - [Checklist khi test](#checklist-khi-test-3)
+- [API5:2023 — Broken Function Level Authorization (BFLA)](#api52023--broken-function-level-authorization-bfla)
+  - [Khái niệm](#khái-niệm-4)
+  - [Tại sao bị lỗi?](#tại-sao-bị-lỗi-4)
+  - [Các cách khai thác](#các-cách-khai-thác-4)
+  - [Checklist khi test](#checklist-khi-test-4)
 
 ---
 
@@ -671,3 +676,162 @@ Flood endpoint → đốt hết credit của nạn nhân.
 - [ ] Tìm endpoint gọi third-party API → gọi liên tục xem có bị chặn không
 - [ ] Gửi payload cực lớn (body, header, query string) xem server xử lý thế nào
 - [ ] Kiểm tra timeout — request giữ connection lâu có bị ngắt không?
+
+---
+
+# API5:2023 — Broken Function Level Authorization (BFLA)
+
+## Khái niệm
+
+BFLA xảy ra khi API **không kiểm tra xem user có quyền gọi một chức năng (function/endpoint) cụ thể hay không**, dẫn đến user thường có thể gọi được các chức năng chỉ dành cho admin.
+
+**Phân biệt với BOLA:**
+- **BOLA** — đúng chức năng, sai *object* → user A xem data của user B
+- **BFLA** — sai *chức năng* → user thường gọi được endpoint chỉ admin mới được dùng
+
+**Ví dụ thực tế:**
+App quản lý nhân sự có 2 loại user: nhân viên và HR admin. Nhân viên chỉ được xem lương của mình. Nhưng nếu endpoint `DELETE /api/employees/55` không kiểm tra role → nhân viên thường có thể xóa hồ sơ của người khác.
+
+**Điểm mấu chốt:**
+Hệ thống chỉ ẩn endpoint admin trên UI, nhưng **không chặn ở phía server**. Attacker chỉ cần biết URL là gọi được.
+
+> **CWE liên quan:** CWE-285 — Improper Authorization
+
+---
+
+## Tại sao bị lỗi?
+
+| Nguyên nhân | Mô tả |
+|-------------|-------|
+| Chỉ ẩn UI, không chặn server | Admin endpoint không hiển trên menu nhưng vẫn gọi được |
+| Kiểm tra role ở frontend | JS check role rồi ẩn nút, nhưng API không check |
+| Thiếu middleware phân quyền | Endpoint quên gắn `require_admin` middleware |
+| HTTP method khác nhau | GET được bảo vệ nhưng DELETE/PUT cùng path thì không |
+| API version cũ | `/api/v1/admin/users` bị chặn nhưng `/api/v2/admin/users` thì không |
+
+```python
+# ❌ Vulnerable — chỉ check đăng nhập, không check role
+@app.delete("/api/users/{user_id}")
+def delete_user(user_id: int, current_user = Depends(get_current_user)):
+    db.query(User).filter(User.id == user_id).delete()
+    return {"msg": "deleted"}
+
+# ✅ Fixed — check thêm role admin
+@app.delete("/api/users/{user_id}")
+def delete_user(user_id: int, current_user = Depends(get_current_user)):
+    if current_user.role != "admin":
+        raise HTTPException(403)
+    db.query(User).filter(User.id == user_id).delete()
+    return {"msg": "deleted"}
+```
+
+---
+
+## Các cách khai thác
+
+### 1. Truy Cập Trực Tiếp Admin Endpoint
+Endpoint admin không hiển trên UI nhưng vẫn tồn tại trên server.
+```http
+# User thường gọi thẳng endpoint admin
+GET  /api/admin/users HTTP/1.1
+POST /api/admin/users/promote HTTP/1.1
+DELETE /api/admin/users/55 HTTP/1.1
+Authorization: Bearer <token_of_normal_user>
+```
+Nếu server chỉ ẩn trên UI mà không check role → trả về 200 OK.
+
+---
+
+### 2. HTTP Method Switching
+Server chỉ bảo vệ GET nhưng quên bảo vệ các method khác trên cùng path.
+```http
+# GET được bảo vệ → 403
+GET /api/users/55 HTTP/1.1
+
+# DELETE cùng path nhưng không check role → 200 OK
+DELETE /api/users/55 HTTP/1.1
+Authorization: Bearer <token_of_normal_user>
+
+# PUT để sửa role của user khác
+PUT /api/users/55 HTTP/1.1
+{"role": "admin"}
+```
+
+---
+
+### 3. API Version Bypass
+Version mới được vá nhưng version cũ vẫn chạy và không có auth check.
+```http
+# Bị chặn
+GET /api/v2/admin/reports HTTP/1.1  → 403
+
+# Version cũ vẫn hoạt động
+GET /api/v1/admin/reports HTTP/1.1  → 200 OK
+GET /api/admin/reports HTTP/1.1     → 200 OK  (không có version)
+```
+
+---
+
+### 4. Path Traversal trong Endpoint
+Thay đổi path để leo từ user endpoint sang admin endpoint.
+```http
+# Endpoint bình thường
+GET /api/users/me/profile HTTP/1.1
+
+# Thử leo lên
+GET /api/users/admin/profile HTTP/1.1
+GET /api/users/me/../admin/list HTTP/1.1
+```
+
+---
+
+### 5. Parameter Pollution — Inject Role trong Request
+Một số framework xử lý tham số trùng tên theo cách không đoán trước được.
+```http
+GET /api/users?role=user&role=admin HTTP/1.1
+POST /api/action HTTP/1.1
+{"action": "view", "action": "delete"}
+```
+
+---
+
+### 6. Enum / Fuzz Endpoint Ẩn
+Dùng wordlist để tìm endpoint admin chưa được document.
+```bash
+# [ATTACKER]
+ffuf -u https://target.lab/api/FUZZ \
+  -w /usr/share/wordlists/SecLists/Discovery/Web-Content/api/objects.txt \
+  -H "Authorization: Bearer <user_token>" \
+  -mc 200,201,204
+
+# Fuzz thêm prefix admin
+ffuf -u https://target.lab/api/admin/FUZZ \
+  -w /usr/share/wordlists/SecLists/Discovery/Web-Content/common.txt \
+  -H "Authorization: Bearer <user_token>" \
+  -mc 200,201,204
+```
+
+---
+
+### 7. Swagger / OpenAPI Leak
+Nếu server expose file API docs → lấy được toàn bộ danh sách endpoint kể cả endpoint admin.
+```http
+GET /swagger.json HTTP/1.1
+GET /openapi.json HTTP/1.1
+GET /api/docs HTTP/1.1
+GET /api-docs HTTP/1.1
+```
+Parse file JSON ra → có ngay toàn bộ endpoint, method, parameter để test.
+
+---
+
+## Checklist khi test
+
+- [ ] Fuzz `/api/admin/`, `/api/internal/`, `/api/management/` bằng wordlist
+- [ ] Thử tất cả HTTP method (GET/POST/PUT/PATCH/DELETE) trên mỗi endpoint
+- [ ] Kiểm tra các API version cũ (`/v1/`, `/v2/`, không có version)
+- [ ] Tìm Swagger / OpenAPI docs → lấy danh sách endpoint đầy đủ
+- [ ] So sánh response khi gọi bằng token admin vs token user thường
+- [ ] Kiểm tra JS bundle của frontend — thường chứa URL endpoint ẩn
+- [ ] Thử path traversal trong endpoint (`/users/me/../admin/`)
+- [ ] Kiểm tra endpoint có phân biệt role không hay chỉ check đăng nhập
