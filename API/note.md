@@ -44,6 +44,11 @@
   - [Tại sao bị lỗi?](#tại-sao-bị-lỗi-7)
   - [Các cách khai thác](#các-cách-khai-thác-7)
   - [Checklist khi test](#checklist-khi-test-7)
+- [API9:2023 — Improper Inventory Management](#api92023--improper-inventory-management)
+  - [Khái niệm](#khái-niệm-8)
+  - [Tại sao bị lỗi?](#tại-sao-bị-lỗi-8)
+  - [Các cách khai thác](#các-cách-khai-thác-8)
+  - [Checklist khi test](#checklist-khi-test-8)
 
 ---
 
@@ -1366,3 +1371,149 @@ X-AspNet-Version: 4.0.30319
 - [ ] Kiểm tra `Server`, `X-Powered-By` header — có tiết lộ phiên bản không?
 - [ ] Scan TLS bằng `testssl.sh` hoặc `nmap ssl-enum-ciphers`
 - [ ] Kiểm tra Swagger / OpenAPI có bị public không (`/swagger-ui`, `/api-docs`)
+
+---
+
+# API9:2023 — Improper Inventory Management
+
+## Khái niệm
+
+Improper Inventory Management xảy ra khi tổ chức **không nắm rõ toàn bộ các API đang chạy** — bao gồm API cũ, API test, API của bên thứ ba, API ở các môi trường khác nhau — dẫn đến các endpoint không được bảo vệ, vá lỗi, hoặc theo dõi.
+
+**Ví dụ thực tế:**
+Team dev ra mắt API v2 với đầy đủ auth và rate limit. Nhưng API v1 vẫn còn chạy, không ai nhớ để tắt. Attacker tìm ra v1, gọi thẳng vào — không có rate limit, không có patch bảo mật mới nhất, và đôi khi không cần auth.
+
+**Điểm mấu chốt:**
+Không phải lỗi code — là lỗi **quản lý và kiểm soát**. API bị bỏ quên thường là mục tiêu dễ nhất vì không ai theo dõi nó.
+
+> **CWE liên quan:** CWE-1059 — Incomplete Documentation
+
+---
+
+## Tại sao bị lỗi?
+
+| Nguyên nhân | Mô tả |
+|-------------|-------|
+| API version cũ không bị tắt | `/v1/` vẫn chạy sau khi `/v2/` ra mắt |
+| Môi trường staging/dev lộ ra ngoài | `api.staging.target.com` public và dùng data thật |
+| API của bên thứ ba không được kiểm soát | Vendor API được tích hợp nhưng không được audit |
+| Không có API inventory | Không ai biết có bao nhiêu endpoint đang chạy |
+| Shadow API | Endpoint được tạo ra nhưng không được document |
+| Microservice nội bộ lộ ra ngoài | Service chỉ dành cho internal nhưng bị expose public |
+
+---
+
+## Các cách khai thác
+
+### 1. API Version Enumeration
+Tìm các version cũ còn chạy và thiếu bảo mật.
+```bash
+# [ATTACKER] — fuzz version
+ffuf -u https://target.lab/api/FUZZ/users \
+  -w versions.txt \
+  -mc 200,201,301
+
+# versions.txt
+v1
+v2
+v3
+v1.0
+v1.1
+beta
+old
+legacy
+test
+dev
+```
+```http
+# So sánh bảo mật giữa các version
+GET /api/v1/users HTTP/1.1   → 200 OK, không cần token
+GET /api/v2/users HTTP/1.1   → 401 Unauthorized
+```
+
+---
+
+### 2. Staging / Dev Environment Discovery
+Môi trường test thường có bảo mật lỏng hơn production nhưng dùng chung data thật.
+```bash
+# [ATTACKER] — enum subdomain
+ffuf -u https://FUZZ.target.lab \
+  -w /usr/share/wordlists/SecLists/Discovery/DNS/subdomains-top1million-5000.txt \
+  -mc 200,301,302
+
+# Các subdomain phổ biến cần kiểm tra
+api.staging.target.lab
+api.dev.target.lab
+api.test.target.lab
+api.uat.target.lab
+api.sandbox.target.lab
+api.internal.target.lab
+```
+
+---
+
+### 3. Shadow API — Endpoint Không Được Document
+Endpoint tồn tại nhưng không có trong docs — thường thiếu auth check.
+```bash
+# Fuzz endpoint ẩn
+ffuf -u https://target.lab/api/v1/FUZZ \
+  -w /usr/share/wordlists/SecLists/Discovery/Web-Content/api/objects.txt \
+  -H "Authorization: Bearer <token>" \
+  -mc 200,201,204
+```
+```http
+# Ví dụ endpoint ẩn thường gặp
+GET /api/v1/export          ← export toàn bộ data
+GET /api/v1/debug/users     ← debug endpoint quên xóa
+POST /api/v1/admin/migrate  ← endpoint migration còn sót
+```
+
+---
+
+### 4. Mobile App / JS Bundle Recon
+Client-side code thường chứa URL endpoint ẩn mà server chưa tắt.
+```bash
+# [ATTACKER] — tìm endpoint trong JS bundle
+curl https://target.lab/static/main.js | grep -oE '"/api/[^"]+"' | sort -u
+
+# Hoặc decompile APK
+apktool d target.apk
+grep -r "api/" target/smali/ | grep -oE '/api/[a-zA-Z0-9/_-]+' | sort -u
+```
+
+---
+
+### 5. Exposed Internal Microservice
+Service nội bộ vô tình bị expose ra internet.
+```http
+# Các port microservice phổ biến
+GET https://target.lab:8080/internal/users HTTP/1.1
+GET https://target.lab:3000/admin HTTP/1.1
+GET https://target.lab:9090/metrics HTTP/1.1   ← Prometheus
+GET https://target.lab:8500/v1/catalog/services  ← Consul
+```
+
+---
+
+### 6. Deprecated Endpoint Vẫn Hoạt Động
+Endpoint cũ được thông báo deprecated nhưng chưa bị tắt, thiếu các patch bảo mật mới.
+```http
+# Endpoint mới đã được vá BOLA
+GET /api/v2/orders/1001 HTTP/1.1  → 403 (có ownership check)
+
+# Endpoint cũ chưa được vá
+GET /api/v1/orders/1001 HTTP/1.1  → 200 OK (không có ownership check)
+```
+
+---
+
+## Checklist khi test
+
+- [ ] Fuzz API version: `v1`, `v2`, `beta`, `legacy`, `old`, `test`, `dev`
+- [ ] Enum subdomain tìm môi trường staging/dev/uat
+- [ ] Fuzz endpoint ẩn bằng SecLists API wordlist
+- [ ] Đọc JS bundle / decompile APK để tìm URL endpoint
+- [ ] Scan port phổ biến của microservice (8080, 3000, 9090, 8500)
+- [ ] So sánh bảo mật giữa các version — v1 có thiếu patch mà v2 đã vá không?
+- [ ] Kiểm tra Swagger có liệt kê đủ tất cả endpoint không hay có endpoint ẩn
+- [ ] Kiểm tra môi trường staging có dùng data thật không
