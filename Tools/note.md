@@ -6,6 +6,7 @@
 |------|-------|-----------|
 | [EyeWitness](#eyewitness) | Chụp ảnh màn hình hàng loạt web service, nhận diện default credential | Reconnaissance |
 | [Aquatone](#aquatone) | Chụp ảnh và tổng hợp visual report các web host từ nhiều nguồn đầu vào | Reconnaissance |
+| [Nmap](#nmap) | Network scanner — phát hiện host, port, service, OS, chạy script | Reconnaissance / Enumeration |
 
 ---
 
@@ -351,3 +352,266 @@ Report HTML có:
 - Kết hợp `httpx` trước để lọc host còn sống, giảm thời gian chạy
 - File `aquatone_session.json` cho phép resume nếu bị ngắt giữa chừng
 - Dùng `-silent` khi chạy trong script để tránh noise
+
+---
+
+# Nmap
+
+**Repo:** https://github.com/nmap/nmap
+**Tác giả:** Gordon Lyon (Fyodor)
+**Ngôn ngữ:** C / C++ / Lua (NSE)
+
+## Khái niệm
+
+Nmap (Network Mapper) là tool **quét mạng** mạnh nhất và phổ biến nhất trong pentest. Nó có thể:
+- Phát hiện host nào đang sống trong mạng
+- Phát hiện port nào đang mở trên mỗi host
+- Xác định service và phiên bản đang chạy
+- Xác định hệ điều hành (OS fingerprinting)
+- Chạy script tự động để kiểm tra lỗ hổng (NSE)
+
+---
+
+## Cách Nmap hoạt động
+
+### Giai đoạn 1 — Host Discovery
+Trước khi scan port, Nmap kiểm tra host có sống không bằng cách gửi:
+```
+ICMP Echo Request     ← ping thông thường
+ICMP Timestamp        ← ping dạng khác
+TCP SYN → port 443   ← nếu ICMP bị chặn
+TCP ACK → port 80    ← nếu ICMP bị chặn
+```
+Nếu host không trả lời → Nmap bỏ qua, không scan port.
+
+### Giai đoạn 2 — Port Scanning
+Nmap gửi packet đến từng port và phân tích phản hồi:
+
+| Trạng thái | Ý nghĩa |
+|------------|----------|
+| `open` | Port đang mở, có service lắng nghe |
+| `closed` | Port đóng, host trả lời nhưng không có service |
+| `filtered` | Firewall chặn, không có phản hồi |
+| `open\|filtered` | Không xác định được (UDP scan) |
+| `unfiltered` | Port tiếp cận được nhưng không rõ open hay closed |
+
+### Giai đoạn 3 — Service / Version Detection
+Sau khi biết port mở, Nmap gửi **probe** để xác định service và phiên bản:
+```
+Nmap gửi banner grab → so sánh với database nmap-service-probes
+→ trả về: Apache httpd 2.4.49, OpenSSH 8.2p1, ...
+```
+
+### Giai đoạn 4 — OS Detection
+Nmap phân tích **TCP/IP stack fingerprint** — cách host phản hồi với các packet đặc biệt để đoán OS:
+```
+TTL value, TCP window size, IP ID sequence, TCP options
+→ so sánh với database nmap-os-db
+→ trả về: Linux 5.x, Windows Server 2019, ...
+```
+
+### Giai đoạn 5 — NSE Scripts
+Nmap Scripting Engine (NSE) dùng Lua script để tự động hóa kiểm tra:
+```
+default creds, vuln check, brute force, banner grab, ...
+```
+
+---
+
+## Các kiểu scan port
+
+### TCP SYN Scan (`-sS`) — Mặc định, phổ biến nhất
+```
+Attacker  →  SYN          →  Target
+Attacker  ←  SYN/ACK      ←  Target  (port open)
+Attacker  →  RST          →  Target  (không hoàn thành handshake → ít log hơn)
+```
+Nhanh, tương đối ít để lại dấu vết, cần quyền root.
+
+### TCP Connect Scan (`-sT`) — Không cần root
+```
+Attacker  →  SYN          →  Target
+Attacker  ←  SYN/ACK      ←  Target
+Attacker  →  ACK          →  Target  (hoàn thành 3-way handshake)
+Attacker  →  RST          →  Target  (ngắt kết nối)
+```
+Chậm hơn, để lại nhiều log hơn `-sS`.
+
+### UDP Scan (`-sU`)
+```
+Attacker  →  UDP packet   →  Target
+Không có phản hồi        →  open|filtered
+ICMP Port Unreachable    →  closed
+```
+Rất chậm, nhưng cần thiết để tìm DNS (53), SNMP (161), DHCP (67).
+
+### Stealth Scans — Bypass Firewall / IDS
+```bash
+-sF   # FIN scan   → gửi FIN, port đóng trả RST, port mở im lặng
+-sX   # Xmas scan  → gửi FIN+PSH+URG
+-sN   # Null scan  → không gửi flag nào
+```
+Hoạt động trên Linux/Unix, không hoạt động trên Windows (Windows luôn trả RST).
+
+---
+
+## Các cờ quan trọng
+
+### Target Specification
+```bash
+nmap 192.168.1.1              # single IP
+nmap 192.168.1.1-254          # range
+nmap 192.168.1.0/24           # CIDR
+nmap -iL targets.txt          # từ file
+nmap --exclude 192.168.1.1    # loại trừ IP
+```
+
+### Host Discovery
+```bash
+-sn    # Chỉ ping scan, không scan port (host discovery)
+-Pn    # Bỏ qua host discovery, scan port luôn (hữu ích khi ICMP bị chặn)
+-PS    # TCP SYN ping
+-PA    # TCP ACK ping
+-PU    # UDP ping
+```
+
+### Port Selection
+```bash
+-p 80             # scan port 80
+-p 80,443,8080    # scan nhiều port
+-p 1-1000         # scan dải port
+-p-               # scan tất cả 65535 port
+-F                # fast scan — 100 port phổ biến nhất
+--top-ports 1000  # scan 1000 port phổ biến nhất
+```
+
+### Scan Type
+```bash
+-sS    # TCP SYN scan (mặc định, cần root)
+-sT    # TCP Connect scan (không cần root)
+-sU    # UDP scan
+-sA    # TCP ACK scan (kiểm tra firewall rule)
+-sV    # Version detection
+-sC    # Chạy default NSE scripts
+-O     # OS detection
+-A     # Aggressive: -sV + -sC + -O + traceroute
+```
+
+### Timing Template
+```bash
+-T0   # Paranoid   — rất chậm, tránh IDS
+-T1   # Sneaky     — chậm
+-T2   # Polite     — chậm, ít tải mạng
+-T3   # Normal     — mặc định
+-T4   # Aggressive — nhanh, dùng trong lab
+-T5   # Insane     — rất nhanh, dễ bị phát hiện
+```
+
+### Output
+```bash
+-oN output.txt    # Normal output
+-oX output.xml    # XML (dùng với EyeWitness / Aquatone)
+-oG output.gnmap  # Grepable output
+-oA output        # Lưu cả 3 định dạng cùng lúc
+-v                # Verbose
+-vv               # Very verbose
+```
+
+### NSE Scripts
+```bash
+-sC                          # Chạy default scripts
+--script=<tên>              # Chạy script cụ thể
+--script=vuln                # Chạy tất cả script kiểm tra vuln
+--script=http-title          # Lấy title trang web
+--script=banner              # Lấy banner service
+--script=ssh-brute           # Brute force SSH
+--script-args=<key=value>    # Truyền tham số cho script
+```
+
+---
+
+## Các lệnh phổ biến trong pentest
+
+### Quick scan — Kiểm tra nhanh host sống
+```bash
+nmap -sn 192.168.1.0/24
+```
+
+### Scan port phổ biến + version
+```bash
+nmap -sV --top-ports 1000 -T4 192.168.1.1
+```
+
+### Full scan tất cả port
+```bash
+nmap -sV -p- -T4 192.168.1.1
+```
+
+### Aggressive scan — lấy nhiều thông tin nhất
+```bash
+nmap -A -T4 192.168.1.1
+```
+
+### Scan + xuất XML cho EyeWitness / Aquatone
+```bash
+nmap -sV -p 80,443,8080,8443 192.168.1.0/24 -oA scan_result
+```
+
+### Scan UDP các port quan trọng
+```bash
+nmap -sU -p 53,67,68,69,123,161,162,500 -T4 192.168.1.1
+```
+
+### Bypass firewall — fragment packet
+```bash
+nmap -f -sS 192.168.1.1          # Fragment packet
+nmap --mtu 24 192.168.1.1        # Custom MTU
+nmap -D RND:10 192.168.1.1       # Decoy scan (giả nhiều IP nguồn)
+nmap -S <spoofed_ip> 192.168.1.1 # Spoof source IP
+```
+
+### Chạy NSE vuln scan
+```bash
+nmap --script=vuln -sV 192.168.1.1
+```
+
+### Scan SMB — tìm EternalBlue
+```bash
+nmap --script=smb-vuln-ms17-010 -p 445 192.168.1.0/24
+```
+
+### Scan HTTP — lấy thông tin web
+```bash
+nmap --script=http-title,http-headers,http-methods -p 80,443,8080 192.168.1.1
+```
+
+---
+
+## Workflow thực tế trong pentest
+
+```
+Bước 1 — Phát hiện host sống
+nmap -sn 192.168.1.0/24 -oG hosts_alive.gnmap
+
+Bước 2 — Scan port nhanh trên host sống
+nmap -sV --top-ports 1000 -T4 -iL hosts.txt -oA quick_scan
+
+Bước 3 — Full scan port trên mục tiêu cụ thể
+nmap -sV -p- -T4 192.168.1.10 -oA full_scan
+
+Bước 4 — Chạy script kiểm tra vuln
+nmap --script=vuln -sV 192.168.1.10
+
+Bước 5 — Đưa XML vào EyeWitness / Aquatone
+cat quick_scan.xml | aquatone -nmap -out ./report
+```
+
+---
+
+## Tips
+
+- Luôn dùng `-oA` để lưu cả 3 định dạng, tiện dùng lại sau
+- Dùng `-Pn` khi target chặn ICMP — rất phổ biến trong môi trường thực tế
+- `-T4` là đủ nhanh cho lab, tránh `-T5` vì dễ bỏ sót port
+- Scan `-p-` mất nhiều thời gian — chỉ dùng sau khi đã xác định mục tiêu cụ thể
+- `--script=vuln` có thể gây noise lớn — dùng cẩn thận trong môi trường thật
