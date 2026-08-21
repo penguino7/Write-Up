@@ -5,6 +5,7 @@
 | Tool | Mô tả | Giai đoạn |
 |------|-------|-----------|
 | [EyeWitness](#eyewitness) | Chụp ảnh màn hình hàng loạt web service, nhận diện default credential | Reconnaissance |
+| [Aquatone](#aquatone) | Chụp ảnh và tổng hợp visual report các web host từ nhiều nguồn đầu vào | Reconnaissance |
 
 ---
 
@@ -177,3 +178,176 @@ Report HTML tự động:
 - Kết hợp với `httpx` để lọc host còn sống trước khi đưa vào EyeWitness
 - Dùng `--timeout 5` khi scan mạng lớn để tránh chờ quá lâu
 - Dùng `--no-prompt` khi chạy trong script tự động
+
+---
+
+# Aquatone
+
+**Repo:** https://github.com/michenriksen/aquatone
+**Tác giả:** michenriksen
+**Ngôn ngữ:** Go
+
+## Khái niệm
+
+Aquatone là tool **chụp ảnh màn hình và tổng hợp visual report** các web host, được thiết kế để nhận nhiều loại đầu vào khác nhau (domain, IP, nmap XML, stdin pipe) và xuất ra HTML report trực quan.
+
+**Điểm khác biệt so với EyeWitness:**
+- Viết bằng Go → binary đơn, không cần cài dependency phức tạp
+- Nhận input qua **stdin pipe** — dễ kết hợp vào pipeline
+- Tốc độ nhanh hơn, nhẹ hơn
+- Report HTML đẹp hơn, có thống kê tổng quan
+
+**Dùng khi nào:**
+- Sau khi có danh sách subdomain từ subfinder / amass / assetfinder
+- Muốn xem nhanh giao diện của hàng trăm host trong 1 report
+- Kết hợp vào recon pipeline tự động
+
+---
+
+## Cài đặt
+
+```bash
+# Tải binary sẵn (không cần build)
+wget https://github.com/michenriksen/aquatone/releases/latest/download/aquatone_linux_amd64.zip
+unzip aquatone_linux_amd64.zip
+chmod +x aquatone
+sudo mv aquatone /usr/local/bin/
+
+# Kiểm tra
+aquatone --version
+```
+
+> Aquatone dùng **Chrome headless** để chụp ảnh — cần cài Chrome hoặc Chromium.
+```bash
+sudo apt install chromium-browser
+```
+
+---
+
+## Cách sử dụng
+
+### Cú pháp cơ bản
+```
+cat <input> | aquatone [options]
+```
+Aquatone nhận input qua **stdin** — luôn dùng pipe.
+
+---
+
+### 1. Từ danh sách subdomain
+```bash
+# File chứa danh sách domain/IP mỗi dòng một cái
+cat domains.txt | aquatone -out recon_output
+```
+
+---
+
+### 2. Kết hợp trực tiếp với subfinder
+```bash
+# [ATTACKER] — pipeline hoàn chỉnh
+subfinder -d target.lab -silent | aquatone -out recon_output
+```
+
+---
+
+### 3. Từ output của Nmap
+```bash
+# Chạy nmap xuất XML
+nmap -sV -p 80,443,8080,8443 192.168.1.0/24 -oX nmap.xml
+
+# Đưa vào aquatone
+cat nmap.xml | aquatone -nmap -out recon_output
+```
+
+---
+
+### 4. Tùy chỉnh port scan
+```bash
+# Mặc định aquatone chỉ check port 80, 443
+# Dùng -ports để mở rộng
+cat domains.txt | aquatone -ports 80,443,8080,8443,8888,3000 -out recon_output
+
+# Dùng profile sẵn có
+cat domains.txt | aquatone -ports small   # 80,443
+cat domains.txt | aquatone -ports medium  # + 8080,8443,8888
+cat domains.txt | aquatone -ports large   # + nhiều port hơn
+cat domains.txt | aquatone -ports xlarge  # tất cả port phổ biến
+```
+
+---
+
+### 5. Tùy chỉnh thread và timeout
+```bash
+cat domains.txt | aquatone \
+  -threads 20 \
+  -timeout 3000 \
+  -out recon_output
+```
+
+---
+
+### 6. Pipeline đầy đủ từ recon đến report
+```bash
+# [ATTACKER] — từ 0 đến report trong 1 dòng
+subfinder -d target.lab -silent | \
+  httpx -silent | \
+  aquatone -ports medium -threads 20 -out ./aquatone_report
+```
+
+---
+
+## Output
+
+```
+aquatone_report/
+├── aquatone_report.html   ← mở file này để xem toàn bộ kết quả
+├── aquatone_urls.txt      ← danh sách URL đã được chụp ảnh
+├── aquatone_session.json  ← session data (dùng để resume)
+├── headers/               ← HTTP response header từng host
+├── html/                  ← HTML source từng trang
+└── screenshots/           ← ảnh chụp màn hình từng host
+```
+
+Report HTML có:
+- Ảnh chụp màn hình kèm URL, status code, response size
+- Bộ lọc theo status code (200, 301, 403, 500...)
+- Thống kê tổng quan số host / status
+
+---
+
+## Các flag quan trọng
+
+| Flag | Mô tả |
+|------|-------|
+| `-out <dir>` | Thư mục lưu output |
+| `-ports <list\|profile>` | Port cần check (small/medium/large/xlarge) |
+| `-threads <n>` | Số luồng song song (mặc định 10) |
+| `-timeout <ms>` | Timeout mỗi request tính bằng ms (mặc định 8000) |
+| `-nmap` | Parse input dạng Nmap XML |
+| `-proxy <url>` | Dùng proxy (kết hợp Burp) |
+| `-chrome-path <path>` | Đường dẫn Chrome/Chromium tùy chỉnh |
+| `-resolution <WxH>` | Độ phân giải ảnh chụp (mặc định 1440x900) |
+| `-silent` | Không in log ra stdout |
+
+---
+
+## So sánh EyeWitness vs Aquatone
+
+| | EyeWitness | Aquatone |
+|-|------------|----------|
+| Ngôn ngữ | Python | Go |
+| Cài đặt | Phức tạp hơn | Binary đơn |
+| Input | File, Nmap XML | Stdin pipe, Nmap XML |
+| Pipeline | Khó kết hợp | Dễ pipe |
+| RDP/VNC | ✅ | ❌ |
+| Default creds | ✅ | ❌ |
+| Tốc độ | Vừa | Nhanh hơn |
+
+---
+
+## Tips
+
+- Dùng `-ports medium` là đủ cho hầu hết trường hợp
+- Kết hợp `httpx` trước để lọc host còn sống, giảm thời gian chạy
+- File `aquatone_session.json` cho phép resume nếu bị ngắt giữa chừng
+- Dùng `-silent` khi chạy trong script để tránh noise
