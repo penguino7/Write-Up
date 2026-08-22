@@ -7,6 +7,7 @@
 | [EyeWitness](#eyewitness) | Chụp ảnh màn hình hàng loạt web service, nhận diện default credential | Reconnaissance |
 | [Aquatone](#aquatone) | Chụp ảnh và tổng hợp visual report các web host từ nhiều nguồn đầu vào | Reconnaissance |
 | [Nmap](#nmap) | Network scanner — phát hiện host, port, service, OS, chạy script | Reconnaissance / Enumeration |
+| [WPScan](#wpscan) | WordPress security scanner — enumerate user, plugin, theme, brute force | Reconnaissance / Exploitation |
 
 ---
 
@@ -615,3 +616,225 @@ cat quick_scan.xml | aquatone -nmap -out ./report
 - `-T4` là đủ nhanh cho lab, tránh `-T5` vì dễ bỏ sót port
 - Scan `-p-` mất nhiều thời gian — chỉ dùng sau khi đã xác định mục tiêu cụ thể
 - `--script=vuln` có thể gây noise lớn — dùng cẩn thận trong môi trường thật
+
+---
+
+# WPScan
+
+**Repo:** https://github.com/wpscanteam/wpscan
+**Tác giả:** WPScan Team
+**Ngôn ngữ:** Ruby
+
+## Khái niệm
+
+WPScan là **WordPress security scanner** chuyên dụng — công cụ tiêu chuẩn để enumerate và kiểm tra bảo mật WordPress. Nó có thể:
+- Xác định version WordPress, plugin, theme
+- Liệt kê user
+- Kiểm tra lỗ hổng đã biết (CVE) qua WPScan Vulnerability Database
+- Brute force đăng nhập
+- Phát hiện cấu hình sai phổ biến
+
+**Dùng khi nào:**
+- Khi xác định target đang chạy WordPress
+- Cần enumerate nhanh user, plugin, theme và version của chúng
+- Cần check CVE theo version plugin/theme
+- Brute force wp-login.php hoặc XML-RPC
+
+---
+
+## Cài đặt
+
+```bash
+# Kali Linux — đã có sẵn
+wpscan --version
+
+# Cài từ RubyGems
+gem install wpscan
+
+# Từ source
+git clone https://github.com/wpscanteam/wpscan.git
+cd wpscan
+bundle install
+ruby wpscan.rb --version
+```
+
+> Đăng ký API token miễn phí tại https://wpscan.com để nhận thông tin CVE đầy đủ.
+
+---
+
+## Cách sử dụng
+
+### Cú pháp cơ bản
+```
+wpscan --url <target> [options]
+```
+
+---
+
+### 1. Scan cơ bản
+```bash
+wpscan --url http://target.lab
+```
+
+---
+
+### 2. Enumerate user
+```bash
+# Enumerate user (thử cả REST API và author scan)
+wpscan --url http://target.lab --enumerate u
+
+# Aggressive — thử nhiều phương pháp hơn
+wpscan --url http://target.lab --enumerate u --plugins-detection aggressive
+```
+
+---
+
+### 3. Enumerate plugin và theme
+```bash
+# Chỉ plugin đang active (passive)
+wpscan --url http://target.lab --enumerate p
+
+# Tất cả plugin (aggressive — chậm hơn nhưng tìm được nhiều hơn)
+wpscan --url http://target.lab --enumerate ap --plugins-detection aggressive
+
+# Plugin + theme + user cùng lúc
+wpscan --url http://target.lab --enumerate u,p,t
+```
+
+---
+
+### 4. Kiểm tra lỗ hổng với API token
+```bash
+# Vulnerable plugins + vulnerable themes + users
+wpscan --url http://target.lab \
+  --api-token <YOUR_TOKEN> \
+  --enumerate vp,vt,u
+
+# Enumerate tất cả
+wpscan --url http://target.lab \
+  --api-token <YOUR_TOKEN> \
+  --enumerate ap,at,u,tt,cb,dbe
+```
+
+---
+
+### 5. Brute force đăng nhập
+```bash
+# Brute force với username cụ thể
+wpscan --url http://target.lab \
+  --usernames admin \
+  --passwords /usr/share/wordlists/rockyou.txt
+
+# Brute force nhiều user từ file
+wpscan --url http://target.lab \
+  --usernames users.txt \
+  --passwords passwords.txt \
+  --max-threads 10
+
+# Brute force qua XML-RPC (nhanh hơn, bypass lockout)
+wpscan --url http://target.lab \
+  --usernames admin \
+  --passwords rockyou.txt \
+  --password-attack xmlrpc-multicall
+```
+
+---
+
+### 6. Tùy chỉnh request
+```bash
+# Dùng cookie (đã đăng nhập)
+wpscan --url http://target.lab \
+  --cookie "wordpress_logged_in_xxx=<value>"
+
+# Dùng proxy (Burp Suite)
+wpscan --url http://target.lab \
+  --proxy http://127.0.0.1:8080
+
+# Custom User-Agent
+wpscan --url http://target.lab \
+  --user-agent "Mozilla/5.0 (compatible)"
+
+# Disable SSL verify (lab tự ký cert)
+wpscan --url https://target.lab --disable-tls-checks
+```
+
+---
+
+### 7. Lưu output
+```bash
+# Output dạng JSON
+wpscan --url http://target.lab \
+  --output wpscan_result.json \
+  --format json
+
+# Output dạng CLI (mặc định)
+wpscan --url http://target.lab \
+  --output wpscan_result.txt \
+  --format cli
+```
+
+---
+
+## Các enumerate component
+
+| Component | Flag | Mô tả |
+|-----------|------|-------|
+| Users | `u` | Enumerate user |
+| Plugins (passive) | `p` | Plugin đang active |
+| All Plugins | `ap` | Tất cả plugin (aggressive) |
+| Themes (passive) | `t` | Theme đang active |
+| All Themes | `at` | Tất cả theme (aggressive) |
+| Vulnerable Plugins | `vp` | Plugin có CVE (cần API token) |
+| Vulnerable Themes | `vt` | Theme có CVE (cần API token) |
+| Timthumbs | `tt` | File timthumb.php lỗi |
+| Config Backups | `cb` | File backup wp-config |
+| DB Exports | `dbe` | File export database |
+
+---
+
+## Các flag quan trọng
+
+| Flag | Mô tả |
+|------|-------|
+| `--url <url>` | URL mục tiêu |
+| `--enumerate <list>` | Danh sách component cần enumerate |
+| `--api-token <token>` | Token WPScan API để lấy CVE |
+| `--usernames <file\|str>` | Username hoặc file username |
+| `--passwords <file>` | Wordlist password |
+| `--max-threads <n>` | Số luồng (mặc định 5) |
+| `--password-attack <type>` | `wp-login`, `xmlrpc`, `xmlrpc-multicall` |
+| `--plugins-detection <mode>` | `passive`, `aggressive`, `mixed` |
+| `--proxy <url>` | Proxy (Burp: http://127.0.0.1:8080) |
+| `--cookie <str>` | Cookie cho authenticated scan |
+| `--disable-tls-checks` | Bỏ qua lỗi SSL |
+| `--output <file>` | File lưu kết quả |
+| `--format <fmt>` | `cli`, `json`, `cli-no-colour` |
+| `--verbose` | Hiển thị chi tiết hơn |
+
+---
+
+## Workflow thực tế
+
+```
+Bước 1 — Scan cơ bản + enumerate user/plugin/theme
+wpscan --url http://target.lab --enumerate u,vp,vt --api-token <TOKEN>
+
+Bước 2 — Nếu tìm được username → brute force
+wpscan --url http://target.lab -U admin -P rockyou.txt --password-attack xmlrpc-multicall
+
+Bước 3 — Nếu tìm được plugin/theme lỗi → tra CVE → exploit
+→ Xem chi tiết CVE trong output WPScan
+→ Tìm PoC trên exploit-db / github
+
+Bước 4 — Nếu có credential admin → RCE qua theme/plugin editor
+```
+
+---
+
+## Tips
+
+- Luôn dùng `--api-token` — không có token thì không thấy CVE
+- `--enumerate ap` (aggressive) tìm được nhiều plugin hơn nhưng tạo nhiều request — dùng cẩn thận trong môi trường thật
+- `--password-attack xmlrpc-multicall` nhanh hơn nhiều so với brute force wp-login.php thông thường
+- Kết hợp với `--proxy http://127.0.0.1:8080` để xem request trong Burp
+- Lưu output JSON để dễ parse và tích hợp vào report
