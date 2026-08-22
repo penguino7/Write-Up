@@ -8,6 +8,7 @@
 | [Aquatone](#aquatone) | Chụp ảnh và tổng hợp visual report các web host từ nhiều nguồn đầu vào | Reconnaissance |
 | [Nmap](#nmap) | Network scanner — phát hiện host, port, service, OS, chạy script | Reconnaissance / Enumeration |
 | [WPScan](#wpscan) | WordPress security scanner — enumerate user, plugin, theme, brute force | Reconnaissance / Exploitation |
+| [WPVulnDB](#wpvulndb) | Database lỗ hổng WordPress — tra cứu CVE theo plugin/theme/core version | Research / Exploitation |
 
 ---
 
@@ -838,3 +839,58 @@ Bước 4 — Nếu có credential admin → RCE qua theme/plugin editor
 - `--password-attack xmlrpc-multicall` nhanh hơn nhiều so với brute force wp-login.php thông thường
 - Kết hợp với `--proxy http://127.0.0.1:8080` để xem request trong Burp
 - Lưu output JSON để dễ parse và tích hợp vào report
+
+---
+
+# WPVulnDB
+
+**URL:** https://wpscan.com/plugins | https://wpscan.com/themes | https://wpscan.com/wordpresses
+**Tên cũ:** WPVulnDB (nay tích hợp vào wpscan.com)
+**Tác giả:** WPScan Team
+
+## Khái niệm
+
+WPVulnDB là **database lỗ hổng bảo mật chuyên biệt cho WordPress** — nguồn dữ liệu CVE mà WPScan dùng để tra cứu khi scan. Có thể dùng trực tiếp qua web hoặc qua API.
+
+**Dùng khi nào:**
+- Đã biết version plugin/theme/WordPress core → tra cứu CVE nhanh
+- Muốn tìm PoC hoặc mô tả chi tiết lỗ hổng
+- Cần API token để WPScan hiển thị CVE trong kết quả scan
+
+## Tra cứu thủ công
+
+```
+# Tìm lỗ hổng theo plugin
+https://wpscan.com/plugins/<plugin-slug>
+
+# Tìm theo theme
+https://wpscan.com/themes/<theme-slug>
+
+# Tìm theo WordPress core version
+https://wpscan.com/wordpresses/<version>
+
+# Ví dụ
+https://wpscan.com/plugins/contact-form-7
+https://wpscan.com/wordpresses/601
+```
+
+## API
+
+```bash
+# Lấy thông tin lỗ hổng plugin qua API
+curl -H "Authorization: Token token=<YOUR_TOKEN>" \
+  https://wpscan.com/api/v3/plugins/<plugin-slug>
+
+# Lấy thông tin WordPress core
+curl -H "Authorization: Token token=<YOUR_TOKEN>" \
+  https://wpscan.com/api/v3/wordpresses/<version-no-dots>
+# Ví dụ version 6.0.1 → 601
+```
+
+> API token miễn phí cho phép 25 request/ngày. Đăng ký tại https://wpscan.com/register
+
+## Tips
+
+- Dùng kết hợp với WPScan: `--api-token <token>` để tự động map CVE vào kết quả scan
+- Mỗi entry có mô tả lỗ hổng, CVSS score, affected version, link tham khảo và đôi khi có PoC
+- Tìm plugin slug từ URL WordPress.org: `wordpress.org/plugins/<slug>`
