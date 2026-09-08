@@ -1,1 +1,1 @@
-
+-> Dùng cho các chương trình dùng trực tiếp các lời system call mà ko dùng các hàm trong thư viện
