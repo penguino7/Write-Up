@@ -1,1 +1,1 @@
-
+->dùng để theo dõi và hiển thị tất cả các hàm thư viện chia sẻ (Shared Library Calls) mà một chương trình gọi khi nó đang chạy.
