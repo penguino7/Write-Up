@@ -1,1 +1,1 @@
-
+-> coi như là 1 plugin tích hợp vào gdb để hiển thị ra các thứ như thanh ghi , các vùng nhớ , con trỏ lệnh ... trong quá trình debug
